@@ -1,0 +1,68 @@
+# ── ASP.NET Core ──────────────────────────────────────────────────────
+*.swp
+*.*~
+project.lock.json
+.DS_Store
+*.pyc
+
+# Build output
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!**/packages/build/
+
+# ── SECRETS (never commit these) ──────────────────────────────────────
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/appsettings.Local.json
+**/*.pfx
+**/*.key
+.env
+.env.*
+!.env.example
+
+# ── Vite / React ───────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# Editor / OS
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+Thumbs.db
+.DS_Store
