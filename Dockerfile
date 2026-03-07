@@ -7,7 +7,7 @@ WORKDIR /app/client
 
 # Install dependencies first (better layer caching)
 COPY housetohome.client/package*.json ./
-RUN npm ci
+RUN npm ci && npm install @tailwindcss/vite
 
 # Copy source and build
 COPY housetohome.client/ ./
