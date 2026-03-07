@@ -41,6 +41,9 @@ WORKDIR /app
 # Copy published .NET app
 COPY --from=server-build /app/publish ./
 
+# Copy seed data — DataSeeder looks for src/data/all-properties.json
+COPY HouseToHome.Server/src/data/ ./src/data/
+
 # Copy built React app into wwwroot so UseStaticFiles() serves it
 COPY --from=client-build /app/client/dist ./wwwroot
 
