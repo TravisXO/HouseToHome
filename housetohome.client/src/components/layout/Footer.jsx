@@ -70,7 +70,7 @@ const LottieDecoration = () => {
         const mountLottie = () => {
             if (!container || container.querySelector('dotlottie-wc')) return
             const el = document.createElement('dotlottie-wc')
-            el.setAttribute('src', '/src/assets/real_estate.lottie')
+            el.setAttribute('src', '/assets/real_estate.lottie')
             el.setAttribute('autoplay', '')
             el.setAttribute('loop', '')
             el.style.width = '300px'
@@ -135,7 +135,7 @@ export default function Footer() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         <Link to="/">
                             <img
-                                src="/src/assets/logo.png"
+                                src="/assets/logo.png"
                                 alt="House to Home Zambia"
                                 style={{ height: '100px', width: '100%', objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
                             />

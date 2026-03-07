@@ -4,9 +4,9 @@ const BLUE = '#0b699c'
 const RED = '#e92026'
 
 const VIDEOS = [
-    '/src/assets/Real_Estate_1.mp4',
-    '/src/assets/Real_Estate_2.mp4',
-    '/src/assets/Real_Estate_3.mp4',
+    '/assets/Real_Estate_1.mp4',
+    '/assets/Real_Estate_2.mp4',
+    '/assets/Real_Estate_3.mp4',
 ]
 
 const AGENTS = [
@@ -14,19 +14,19 @@ const AGENTS = [
         name: 'Raphael Bwalya',
         phone: '+260 979 818 280',
         tel: '+260979818280',
-        img: '/src/assets/rapheal-bwalya.jpg',
+        img: '/assets/rapheal-bwalya.jpg',
     },
     {
         name: 'Ruslana Thornicroft',
         phone: '+260 965 127 888',
         tel: '+260965127888',
-        img: '/src/assets/ruslana-thornicroft.jpg',
+        img: '/assets/ruslana-thornicroft.jpg',
     },
     {
         name: 'James Banda',
         phone: '+260 966 574 377',
         tel: '+260966574377',
-        img: '/src/assets/james-banda.jpg',
+        img: '/assets/james-banda.jpg',
     },
 ]
 

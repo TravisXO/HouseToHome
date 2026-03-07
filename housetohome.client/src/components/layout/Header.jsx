@@ -144,7 +144,7 @@ export default function Header() {
                     {/* Logo */}
                     <Link to="/" className="flex-shrink-0">
                         <img
-                            src="/src/assets/logo.png"
+                            src="/assets/logo.png"
                             alt="House to Home Zambia"
                             style={{ height: '90px', width: 'auto', objectFit: 'contain', transition: 'transform 0.3s ease' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
@@ -204,7 +204,7 @@ export default function Header() {
                 {/* Mobile */}
                 <div className="lg:hidden flex items-center justify-between px-4" style={{ height: '68px' }}>
                     <Link to="/">
-                        <img src="/src/assets/logo.png" alt="House to Home Zambia" style={{ height: '52px', width: 'auto', objectFit: 'contain' }} />
+                        <img src="/assets/logo.png" alt="House to Home Zambia" style={{ height: '52px', width: 'auto', objectFit: 'contain' }} />
                     </Link>
                     <button onClick={() => setMobileOpen(!mobileOpen)} className="flex items-center justify-center w-10 h-10 rounded" style={{ color: BLUE }} aria-label="Toggle navigation">
                         {mobileOpen ? <CloseIcon /> : <MenuIcon />}

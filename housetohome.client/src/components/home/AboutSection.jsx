@@ -66,7 +66,7 @@ export default function AboutSection() {
                             background: `linear-gradient(135deg, ${BLUE} 0%, #0a4f78 100%)`,
                         }}>
                             <img
-                                src="/src/assets/about-main.jpg"
+                                src="/assets/about-main.jpg"
                                 alt="House to Home Zambia team"
                                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                 onError={e => { e.currentTarget.style.display = 'none' }}
@@ -92,7 +92,7 @@ export default function AboutSection() {
                             background: `transparent`,
                         }}>
                             <img
-                                src="/src/assets/logo.png"
+                                src="/assets/logo.png"
                                 alt="House to Home team"
                                 style={{ width: '100%', height: '100%', objectFit: 'fit', display: 'block' }}
                                 onError={e => { e.currentTarget.style.display = 'none' }}
