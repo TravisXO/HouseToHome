@@ -1,0 +1,21 @@
+# Node
+housetohome.client/node_modules
+housetohome.client/dist
+
+# .NET
+HouseToHome.Server/bin
+HouseToHome.Server/obj
+
+# Git / IDE
+.git
+.gitignore
+.vs
+.vscode
+.idea
+**/*.user
+
+# Secrets
+**/appsettings.Development.json
+**/appsettings.Local.json
+.env
+.env.*
