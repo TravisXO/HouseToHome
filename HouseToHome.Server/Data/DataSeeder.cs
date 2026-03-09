@@ -1,202 +1,219 @@
-﻿using System.Text;
-using System.Text.Json;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using HouseToHome.Server.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace HouseToHome.Server.Data
 {
     public static class DataSeeder
     {
-        private const string WixCdnBase = "https://static.wixstatic.com/media/";
-
-        public static async Task SeedAsync(AppDbContext db, ILogger? logger = null)
+        // ── JSON deserialization options ──────────────────────────────────────
+        private static readonly JsonSerializerOptions JsonOpts = new()
         {
-            if (db.Properties.Any())
+            PropertyNameCaseInsensitive = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        };
+
+        // ── Entry point ───────────────────────────────────────────────────────
+        public static async Task SeedAsync(AppDbContext db, ILogger logger)
+        {
+            // No-op if already seeded
+            if (await db.Properties.AnyAsync())
             {
-                logger?.LogInformation("DataSeeder: table already has data — skipping.");
+                logger.LogInformation("DataSeeder: table already has data — skipping.");
                 return;
             }
 
-            var jsonPath = FindJsonFile("all-properties.json");
-            if (jsonPath == null)
+            var path = FindJsonFile("all-properties.json");
+            if (path == null)
             {
-                logger?.LogWarning("DataSeeder: all-properties.json not found — skipping seed.");
+                logger.LogWarning("DataSeeder: all-properties.json not found — no data seeded.");
                 return;
             }
 
-            logger?.LogInformation("DataSeeder: loading {Path}", jsonPath);
+            logger.LogInformation("DataSeeder: seeding from {Path}", path);
 
-            await using var stream = File.OpenRead(jsonPath);
-            var options = new JsonSerializerOptions
+            var json = await File.ReadAllTextAsync(path);
+            var raw = JsonSerializer.Deserialize<List<RawProperty>>(json, JsonOpts);
+            if (raw == null || raw.Count == 0)
             {
-                PropertyNameCaseInsensitive = false,
-                AllowTrailingCommas = true,
-                ReadCommentHandling = JsonCommentHandling.Skip,
-            };
-
-            var wixItems = await JsonSerializer.DeserializeAsync<List<WixProperty>>(stream, options);
-            if (wixItems == null || wixItems.Count == 0)
-            {
-                logger?.LogWarning("DataSeeder: JSON deserialized to empty list — nothing to seed.");
+                logger.LogWarning("DataSeeder: JSON parsed but contained 0 records.");
                 return;
             }
 
-            var slugTracker = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var properties = new List<Property>();
+            var properties = raw
+                .Select((r, i) => MapToProperty(r, i))
+                .Where(p => p != null)
+                .Cast<Property>()
+                .ToList();
 
-            foreach (var w in wixItems)
-            {
-                if (string.IsNullOrWhiteSpace(w.Title)) continue;
-
-                var title = w.Title.Trim();
-                // Truncate to respect [MaxLength(500)] on the Title column
-                if (title.Length > 500) title = title[..500];
-
-                var pricingLabel = (w.Pricing ?? string.Empty).Trim();
-                // Truncate to respect [MaxLength(200)] on the PricingLabel column
-                if (pricingLabel.Length > 200) pricingLabel = pricingLabel[..200];
-
-                var location = (w.Location ?? string.Empty).Trim();
-                // Truncate to respect [MaxLength(150)] on the Location column
-                if (location.Length > 150) location = location[..150];
-
-                var property = new Property
-                {
-                    Id = Guid.NewGuid(),
-                    CreatedDate = DateTime.UtcNow,
-                    UpdatedDate = DateTime.UtcNow,
-
-                    Title = title,
-                    ListingType = MapListingType(w.ListingType),
-                    PropertyStatus = MapFirst(w.PropertyStatus, "Residential"),
-                    PropertyType = MapFirst(w.PropertyType, "House"),
-                    FurnishingStatus = string.Empty,
-
-                    Location = location,
-                    AddressFormatted = string.Empty,
-                    AddressCity = "Lusaka",
-                    AddressCountry = "ZM",
-                    Latitude = null,
-                    Longitude = null,
-
-                    Bedrooms = w.Bedrooms,
-                    Bathrooms = w.Bathroom,
-                    LotSize = (w.LotSize ?? string.Empty).Trim(),
-
-                    Currency = MapCurrency(w.Currency),
-                    Price = ExtractNumericPrice(w.Pricing),
-                    PricingLabel = pricingLabel,
-
-                    Amenities = (w.Amenities ?? string.Empty).Trim(),
-                    Slug = GenerateUniqueSlug(title, slugTracker),
-
-                    Images = MapImages(w.PropertyImages),
-                };
-
-                properties.Add(property);
-            }
-
-            db.Properties.AddRange(properties);
+            await db.Properties.AddRangeAsync(properties);
             await db.SaveChangesAsync();
 
-            logger?.LogInformation("DataSeeder: inserted {Count} properties.", properties.Count);
+            logger.LogInformation("DataSeeder: seeded {Count} properties.", properties.Count);
         }
 
-        private static string MapListingType(List<string> values)
+        // ── Map raw JSON → Property entity ───────────────────────────────────
+        private static Property? MapToProperty(RawProperty r, int index)
         {
-            var raw = (values?.FirstOrDefault() ?? "Rent").Trim();
-            return raw.Equals("Sale", StringComparison.OrdinalIgnoreCase) ? "Buy" : raw;
-        }
+            var title = r.Title?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(title)) return null;
 
-        private static string MapFirst(List<string>? values, string fallback)
-            => values?.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))?.Trim() ?? fallback;
+            // Use provided ID or generate a stable one from title + index
+            var rawId = r.ID?.Trim();
+            var hasGuid = Guid.TryParse(rawId, out var parsedGuid);
+            var id = hasGuid ? parsedGuid : Guid.NewGuid();
 
-        private static string MapCurrency(List<string>? values)
-        {
-            var raw = (values?.FirstOrDefault() ?? "$").Trim();
-            return raw switch
+            // Slug: from property or derived from title
+            var slug = string.IsNullOrWhiteSpace(r.Slug)
+                ? Slugify(title) + "-" + (index + 1)
+                : r.Slug.Trim();
+
+            // Listing type — normalise "Buy" → "Sale" for consistency
+            var listingType = FirstValue(r.ListingType) ?? "Rent";
+            if (listingType.Equals("Buy", StringComparison.OrdinalIgnoreCase)) listingType = "Sale";
+
+            // Currency — normalise "ZMW" → "K"
+            var currency = FirstValue(r.Currency) ?? "$";
+            if (currency.Equals("ZMW", StringComparison.OrdinalIgnoreCase)) currency = "K";
+
+            // Price — try to parse a numeric value from the pricing label
+            var pricingLabel = r.Pricing?.Trim() ?? string.Empty;
+            decimal? price = ParsePrice(pricingLabel);
+
+            // Images — support both old Wix slug format and new Cloudinary URL format
+            var images = (r.PropertyImage ?? new List<RawImage>())
+                .Select(img => new PropertyImage
+                {
+                    Src = ResolveImageUrl(img.Src, img.Slug ?? img.SlugAlt),
+                    Slug = ResolveImageUrl(img.Slug ?? img.SlugAlt, null),
+                    Alt = img.Alt ?? string.Empty,
+                    Description = img.Description ?? string.Empty,
+                    Title = img.Title ?? string.Empty,
+                    Width = img.Settings?.Width,
+                    Height = img.Settings?.Height,
+                })
+                .Where(img => !string.IsNullOrWhiteSpace(img.Src))
+                .ToList();
+
+            return new Property
             {
-                "$" => "USD",
-                "K" => "ZMW",
-                "USD" => "USD",
-                "ZMW" => "ZMW",
-                _ => "USD",
+                Id = id,
+                Slug = slug,
+                Title = title,
+                Location = r.Location?.Trim() ?? string.Empty,
+                ListingType = listingType,
+                PropertyStatus = FirstValue(r.PropertyStatus) ?? "Residential",
+                PropertyType = FirstValue(r.PropertyType) ?? "House",
+                FurnishingStatus = FirstValue(r.FurnishingStatus) ?? string.Empty,
+                Bedrooms = r.Bedrooms,
+                Bathrooms = r.Bathroom,
+                LotSize = r.LotSize?.Trim() ?? string.Empty,
+                Currency = currency,
+                Price = price,
+                PricingLabel = pricingLabel,
+                Amenities = r.Amenities?.Trim() ?? string.Empty,
+                AddressFormatted = r.Address?.Formatted ?? r.Location?.Trim() ?? string.Empty,
+                Latitude = r.Address?.Location?.Latitude,
+                Longitude = r.Address?.Location?.Longitude,
+                Images = images,
+                CreatedDate = DateTime.UtcNow,
             };
         }
 
-        private static decimal? ExtractNumericPrice(string? pricing)
+        // ── Image URL resolution ──────────────────────────────────────────────
+        // Handles three cases:
+        //   1. Already a Cloudinary / HTTPS URL  → return as-is
+        //   2. wix:image://v1/<slug>/...          → build Wix CDN URL (legacy fallback)
+        //   3. Plain slug (a610ee_...~mv2.jpg)    → build Wix CDN URL (legacy fallback)
+        private static string ResolveImageUrl(string? primary, string? fallbackSlug)
         {
-            if (string.IsNullOrWhiteSpace(pricing)) return null;
-            var cleaned = pricing.Replace(",", "").Replace("$", "").Replace("K", "");
-            var match = Regex.Match(cleaned, @"\d+(\.\d+)?");
-            if (match.Success && decimal.TryParse(match.Value, out var result))
-                return result;
+            var val = primary?.Trim() ?? fallbackSlug?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(val)) return string.Empty;
+
+            // Already a clean HTTPS URL (Cloudinary or other CDN)
+            if (val.StartsWith("https://") || val.StartsWith("http://"))
+                return val;
+
+            // Wix image URI scheme → extract slug and build CDN URL
+            var wixMatch = Regex.Match(val, @"wix:image://v1/([^/]+)/");
+            if (wixMatch.Success)
+                return $"https://static.wixstatic.com/media/{wixMatch.Groups[1].Value}";
+
+            // Plain slug
+            if (!val.Contains('/') && !val.Contains(':'))
+                return $"https://static.wixstatic.com/media/{val}";
+
+            return val;
+        }
+
+        // ── Price parsing ─────────────────────────────────────────────────────
+        // Extracts a numeric price from strings like "$1,500/month", "K2.1 million", "$1,700"
+        private static decimal? ParsePrice(string label)
+        {
+            if (string.IsNullOrWhiteSpace(label)) return null;
+
+            // Handle "X million" / "X.X million"
+            var millionMatch = Regex.Match(label, @"([\d,.]+)\s*million", RegexOptions.IgnoreCase);
+            if (millionMatch.Success && decimal.TryParse(
+                    millionMatch.Groups[1].Value.Replace(",", ""),
+                    out var millions))
+                return millions * 1_000_000m;
+
+            // Extract first numeric sequence (digits, commas, dots)
+            var numMatch = Regex.Match(label, @"[\d,]+(\.\d+)?");
+            if (numMatch.Success && decimal.TryParse(
+                    numMatch.Value.Replace(",", ""),
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var price))
+                return price;
+
             return null;
         }
 
-        private static List<PropertyImage> MapImages(List<WixImage>? wixImages)
+        // ── Slug generation ───────────────────────────────────────────────────
+        private static string Slugify(string text)
         {
-            if (wixImages == null) return new();
-
-            return wixImages
-                .Where(i => !string.IsNullOrWhiteSpace(i.Slug))
-                .Select(i => new PropertyImage
-                {
-                    Slug = WixCdnBase + i.Slug,
-                    Alt = i.Alt ?? string.Empty,
-                    Width = i.Settings?.Width ?? 0,
-                    Height = i.Settings?.Height ?? 0,
-                })
-                .ToList();
+            var slug = text.ToLowerInvariant();
+            slug = Regex.Replace(slug, @"[^a-z0-9\s-]", "");
+            slug = Regex.Replace(slug, @"\s+", "-");
+            slug = Regex.Replace(slug, @"-+", "-").Trim('-');
+            return slug.Length > 80 ? slug[..80] : slug;
         }
 
-        private static string GenerateUniqueSlug(string title, HashSet<string> tracker)
-        {
-            var baseSlug = ToSlug(title);
-            if (baseSlug.Length > 240) baseSlug = baseSlug[..240];
+        // ── Helper: first element of a string array or null ───────────────────
+        private static string? FirstValue(List<string>? list) =>
+            list?.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s))?.Trim();
 
-            var slug = baseSlug;
-            var counter = 2;
-            while (!tracker.Add(slug))
-                slug = $"{baseSlug}-{counter++}";
-
-            return slug;
-        }
-
-        private static string ToSlug(string text)
-        {
-            var normalised = text.Normalize(NormalizationForm.FormD);
-            var sb = new StringBuilder();
-            foreach (var c in normalised)
-            {
-                var cat = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
-                if (cat == System.Globalization.UnicodeCategory.NonSpacingMark) continue;
-                sb.Append(char.ToLowerInvariant(c));
-            }
-            var slug = Regex.Replace(sb.ToString(), @"[^a-z0-9]+", "-");
-            return slug.Trim('-');
-        }
-
+        // ── File finder (mirrors AdminController logic) ───────────────────────
         private static string? FindJsonFile(string filename)
         {
+            // Prefer all-current-properties.json (admin-edited) over original
+            var candidates = new[] { "all-current-properties.json", filename };
+
             var dir = AppContext.BaseDirectory;
             for (var i = 0; i < 6; i++)
             {
-                var candidate = Path.Combine(dir, "src", "data", filename);
-                if (File.Exists(candidate)) return candidate;
-
-                candidate = Path.Combine(dir, filename);
-                if (File.Exists(candidate)) return candidate;
-
-                try
+                foreach (var candidate in candidates)
                 {
-                    foreach (var clientDir in Directory.GetDirectories(dir, "*client*", SearchOption.TopDirectoryOnly))
+                    var path = Path.Combine(dir, "src", "data", candidate);
+                    if (File.Exists(path)) return path;
+
+                    path = Path.Combine(dir, candidate);
+                    if (File.Exists(path)) return path;
+
+                    try
                     {
-                        candidate = Path.Combine(clientDir, "src", "data", filename);
-                        if (File.Exists(candidate)) return candidate;
+                        foreach (var clientDir in Directory.GetDirectories(dir, "*client*", SearchOption.TopDirectoryOnly))
+                        {
+                            path = Path.Combine(clientDir, "src", "data", candidate);
+                            if (File.Exists(path)) return path;
+                        }
                     }
+                    catch (UnauthorizedAccessException) { }
                 }
-                catch (UnauthorizedAccessException) { }
 
                 var parent = Directory.GetParent(dir)?.FullName;
                 if (parent == null) break;
@@ -204,5 +221,109 @@ namespace HouseToHome.Server.Data
             }
             return null;
         }
+    }
+
+    // ── Raw JSON shape (matches both old Wix export and new Cloudinary JSON) ──
+    internal class RawProperty
+    {
+        [JsonPropertyName("ID")]
+        public string? ID { get; set; }
+
+        [JsonPropertyName("Slug")]
+        public string? Slug { get; set; }
+
+        [JsonPropertyName("Title")]
+        public string? Title { get; set; }
+
+        [JsonPropertyName("Location")]
+        public string? Location { get; set; }
+
+        [JsonPropertyName("Listing Type")]
+        public List<string>? ListingType { get; set; }
+
+        [JsonPropertyName("Propety Status")]   // original Wix typo preserved
+        public List<string>? PropertyStatus { get; set; }
+
+        [JsonPropertyName("Property Type")]
+        public List<string>? PropertyType { get; set; }
+
+        [JsonPropertyName("Furnishing Status")]
+        public List<string>? FurnishingStatus { get; set; }
+
+        [JsonPropertyName("Bedrooms")]
+        public int? Bedrooms { get; set; }
+
+        [JsonPropertyName("Bathroom")]
+        public int? Bathroom { get; set; }
+
+        [JsonPropertyName("Lot Size")]
+        public string? LotSize { get; set; }
+
+        [JsonPropertyName("Currency")]
+        public List<string>? Currency { get; set; }
+
+        [JsonPropertyName("Pricing")]
+        public string? Pricing { get; set; }
+
+        [JsonPropertyName("Ammenities")]       // original Wix typo preserved
+        public string? Amenities { get; set; }
+
+        [JsonPropertyName("Property Image")]
+        public List<RawImage>? PropertyImage { get; set; }
+
+        [JsonPropertyName("Address")]
+        public RawAddress? Address { get; set; }
+    }
+
+    internal class RawImage
+    {
+        [JsonPropertyName("slug")]
+        public string? Slug { get; set; }
+
+        // Some entries use capital Slug after migration
+        [JsonPropertyName("Slug")]
+        public string? SlugAlt { get; set; }
+
+        [JsonPropertyName("src")]
+        public string? Src { get; set; }
+
+        [JsonPropertyName("alt")]
+        public string? Alt { get; set; }
+
+        [JsonPropertyName("description")]
+        public string? Description { get; set; }
+
+        [JsonPropertyName("title")]
+        public string? Title { get; set; }
+
+        [JsonPropertyName("settings")]
+        public RawImageSettings? Settings { get; set; }
+    }
+
+    internal class RawImageSettings
+    {
+        [JsonPropertyName("width")]
+        public int? Width { get; set; }
+
+        [JsonPropertyName("height")]
+        public int? Height { get; set; }
+    }
+
+    internal class RawAddress
+    {
+        [JsonPropertyName("formatted")]
+        public string? Formatted { get; set; }
+
+        [JsonPropertyName("location")]
+        public RawLatLng? Location { get; set; }
+    }
+
+    internal class RawLatLng
+    {
+        [JsonPropertyName("latitude")]
+        public double? Latitude { get; set; }
+
+        [JsonPropertyName("longitude")]
+        public double? Longitude { get; set; }
     }
 }

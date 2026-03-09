@@ -14,9 +14,20 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// ── Validate connection string early so the error is obvious ──────────────
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Connection string 'DefaultConnection' is missing or empty.\n" +
+        "Add it to appsettings.Development.json or use dotnet user-secrets:\n" +
+        "  dotnet user-secrets set \"ConnectionStrings:DefaultConnection\" " +
+        "\"Host=localhost;Port=5432;Database=housetohome;Username=postgres;Password=yourpassword\"");
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
-        new NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("DefaultConnection"))
+        new NpgsqlDataSourceBuilder(connectionString)
             .EnableDynamicJson()
             .Build()
     )

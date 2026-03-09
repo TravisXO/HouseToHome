@@ -52,7 +52,7 @@ export default function AboutStory() {
                         }}
                     >
                         <img
-                            src="/src/assets/about-main.jpg"
+                            src="/public/assets/about-main.jpg"
                             alt="House to Home Zambia team"
                             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                             onError={e => { e.currentTarget.style.display = 'none' }}

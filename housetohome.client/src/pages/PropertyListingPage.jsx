@@ -1,16 +1,46 @@
-﻿import { useState, useEffect, useRef } from 'react'
-import { useLocation, Link } from 'react-router-dom'
+﻿import { useState, useEffect, useCallback, useReducer } from 'react'
+import { useLocation, useSearchParams, Link } from 'react-router-dom'
 import PropertyCard from '../components/properties/PropertyCard'
 
 const BLUE = '#0b699c'
 const RED = '#e92026'
 
-// ── Wix CDN image resizing ────────────────────────────────────────────
-export function wixImg(url, w, h, q = 80) {
-    if (!url || !url.includes('wixstatic.com')) return url
-    const base = url.split('/v1/')[0]
-    const filename = base.split('/').pop()
-    return `${base}/v1/fill/w_${w},h_${h},al_c,q_${q},usm_0.33_1.00_0.00/${filename}`
+// ── JSON normalisation (mirrors AdminPage) ────────────────────────────
+function arrFirst(val, fb = '') {
+    return Array.isArray(val) ? val[0] || fb : val || fb
+}
+
+function parsePrice(label) {
+    if (!label) return null
+    const m = label.match(/([\d,.]+)\s*million/i)
+    if (m) { const n = parseFloat(m[1].replace(/,/g, '')); return isNaN(n) ? null : n * 1_000_000 }
+    const n2 = label.match(/[\d,]+(\.\d+)?/)
+    if (n2) { const n = parseFloat(n2[0].replace(/,/g, '')); return isNaN(n) ? null : n }
+    return null
+}
+
+function normaliseProperty(raw) {
+    const lt = arrFirst(raw['Listing Type'], 'Rent')
+    const pricingLabel = raw.Pricing?.trim() || ''
+    return {
+        id: raw.ID || '',
+        slug: raw.Slug?.trim() || raw.ID || '',
+        title: raw.Title?.trim() || '',
+        location: raw.Location?.trim() || '',
+        listingType: lt.toLowerCase() === 'buy' ? 'Sale' : lt,
+        propertyStatus: arrFirst(raw['Propety Status'], 'Residential'),
+        propertyType: arrFirst(raw['Property Type'], 'House'),
+        furnishingStatus: arrFirst(raw['Furnishing Status'], ''),
+        bedrooms: raw.Bedrooms ?? null,
+        bathrooms: raw.Bathroom ?? null,
+        lotSize: raw['Lot Size']?.trim() || '',
+        currency: arrFirst(raw.Currency, '$'),
+        pricingLabel,
+        price: parsePrice(pricingLabel),
+        amenities: raw.Ammenities?.trim() || '',
+        addressFormatted: raw.Location?.trim() || '',
+        images: raw['Property Image'] || [],
+    }
 }
 
 const ROUTE_CONFIG = {
@@ -101,79 +131,124 @@ const SORT_OPTIONS = [
     { value: 'price_desc', label: 'Price: High → Low' },
 ]
 
+// ── Filter state via useReducer ───────────────────────────────────────────────
+// Using a reducer means the route-change effect only calls dispatch() once,
+// satisfying the react-hooks/set-state-in-effect lint rule.
+
+function initFilters(searchParams) {
+    return {
+        page: 1,
+        sort: 'newest',
+        propertyType: searchParams.get('propertyType') || '',
+        currency: searchParams.get('currency') || '',
+        minPrice: searchParams.get('minPrice') || '',
+        maxPrice: searchParams.get('maxPrice') || '',
+        bedrooms: searchParams.get('bedrooms') ? `${searchParams.get('bedrooms')}+` : '',
+        bathrooms: searchParams.get('bathrooms') ? `${searchParams.get('bathrooms')}+` : '',
+        search: searchParams.get('q') || '',
+        searchDraft: searchParams.get('q') || '',
+    }
+}
+
+function filtersReducer(state, action) {
+    switch (action.type) {
+        case 'INIT': return { ...action.payload }
+        case 'SET': return { ...state, [action.field]: action.value }
+        case 'CLEAR': return { ...action.payload }
+        default: return state
+    }
+}
+
 export default function PropertyListingPage() {
     const { pathname } = useLocation()
+    const [searchParams] = useSearchParams()
     const config = ROUTE_CONFIG[pathname]
-    const filtersRef = useRef(null)
 
-    const [properties, setProperties] = useState([])
-    const [total, setTotal] = useState(0)
-    const [pages, setPages] = useState(1)
-    const [page, setPage] = useState(1)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState(null)
+    // ── All filter fields in one reducer ──
+    const [filters, dispatch] = useReducer(filtersReducer, searchParams, initFilters)
+    const { page, sort, propertyType, currency, minPrice, maxPrice, bedrooms, bathrooms, search, searchDraft } = filters
+
+    // ── Named setter wrappers so existing JSX below needs no changes ──
+    const setPage = useCallback((v) => dispatch({ type: 'SET', field: 'page', value: typeof v === 'function' ? v(filters.page) : v }), [filters.page])
+    const setSort = useCallback((v) => dispatch({ type: 'SET', field: 'sort', value: v }), [])
+    const setPropertyType = useCallback((v) => dispatch({ type: 'SET', field: 'propertyType', value: v }), [])
+    const setCurrency = useCallback((v) => dispatch({ type: 'SET', field: 'currency', value: v }), [])
+    const setMinPrice = useCallback((v) => dispatch({ type: 'SET', field: 'minPrice', value: v }), [])
+    const setMaxPrice = useCallback((v) => dispatch({ type: 'SET', field: 'maxPrice', value: v }), [])
+    const setBedrooms = useCallback((v) => dispatch({ type: 'SET', field: 'bedrooms', value: v }), [])
+    const setBathrooms = useCallback((v) => dispatch({ type: 'SET', field: 'bathrooms', value: v }), [])
+    const setSearch = useCallback((v) => dispatch({ type: 'SET', field: 'search', value: v }), [])
+    const setSearchDraft = useCallback((v) => dispatch({ type: 'SET', field: 'searchDraft', value: v }), [])
+
+    // ── Fetch state — single object so setFetchState is called once per fetch ──
+    const [fetchState, setFetchState] = useState({ properties: [], total: 0, pages: 1, loading: true, error: null })
+    const { properties, total, pages, loading, error } = fetchState
+
     const [filtersOpen, setFiltersOpen] = useState(false)
-    const [sort, setSort] = useState('newest')
-
-    // Filters
-    const [propertyType, setPropertyType] = useState('')
-    const [currency, setCurrency] = useState('')
-    const [minPrice, setMinPrice] = useState('')
-    const [maxPrice, setMaxPrice] = useState('')
-    const [bedrooms, setBedrooms] = useState('')
-    const [bathrooms, setBathrooms] = useState('')
-    const [search, setSearch] = useState('')
-    const [searchDraft, setSearchDraft] = useState('')
 
     const activeFilterCount = [propertyType, currency, minPrice, maxPrice, bedrooms, bathrooms, search].filter(Boolean).length
 
+    // ── Route change: reset all filters — single dispatch, not multiple setStates ──
     useEffect(() => {
-        setPage(1)
-        setPropertyType('')
-        setCurrency('')
-        setMinPrice('')
-        setMaxPrice('')
-        setBedrooms('')
-        setBathrooms('')
-        setSearch('')
-        setSearchDraft('')
-        setSort('newest')
-    }, [pathname])
+        dispatch({ type: 'INIT', payload: initFilters(searchParams) })
+    }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
+    // ── retryCount bumped by the retry button to re-trigger the effect ──────
+    const [retryCount, setRetryCount] = useState(0)
+
+    // ── Fetch + client-side filter — all state updates inside async callbacks ─
     useEffect(() => {
         if (!config) return
         let cancelled = false
-        setLoading(true)
-        setError(null)
 
-        const params = new URLSearchParams({
-            listingType: config.listingType,
-            propertyStatus: config.propertyStatus,
-            page: String(page),
-            pageSize: String(PAGE_SIZE),
-            sort,
-        })
-        if (propertyType) params.set('propertyType', propertyType)
-        if (currency) params.set('currency', currency)
-        if (minPrice) params.set('minPrice', minPrice)
-        if (maxPrice) params.set('maxPrice', maxPrice)
-        if (bedrooms) params.set('bedrooms', bedrooms.replace('+', ''))
-        if (bathrooms) params.set('bathrooms', bathrooms.replace('+', ''))
-        if (search) params.set('q', search)
-
-        fetch(`/api/properties?${params}`)
+        fetch('/api/admin/properties')
             .then(res => { if (!res.ok) throw new Error('Failed to load properties'); return res.json() })
-            .then(data => {
+            .then(raw => {
                 if (cancelled) return
-                setProperties(data.items)
-                setTotal(data.total)
-                setPages(data.pages)
+
+                let all = raw.map(normaliseProperty)
+
+                // Route filter
+                const configLt = config.listingType.toLowerCase()
+                all = all.filter(p => {
+                    const lt = p.listingType.toLowerCase()
+                    const ltMatch = lt === configLt || (configLt === 'buy' && (lt === 'sale' || lt === 'buy'))
+                    return ltMatch && p.propertyStatus === config.propertyStatus
+                })
+
+                // Additional filters
+                if (propertyType) all = all.filter(p => p.propertyType === propertyType)
+                if (currency) all = all.filter(p => p.currency === currency)
+                if (minPrice) all = all.filter(p => p.price != null && p.price >= Number(minPrice))
+                if (maxPrice) all = all.filter(p => p.price != null && p.price <= Number(maxPrice))
+                if (bedrooms) all = all.filter(p => p.bedrooms != null && p.bedrooms >= Number(bedrooms.replace('+', '')))
+                if (bathrooms) all = all.filter(p => p.bathrooms != null && p.bathrooms >= Number(bathrooms.replace('+', '')))
+                if (search) {
+                    const q = search.toLowerCase()
+                    all = all.filter(p =>
+                        p.title.toLowerCase().includes(q) ||
+                        p.location.toLowerCase().includes(q)
+                    )
+                }
+
+                // Sort
+                if (sort === 'price_asc') all.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity))
+                if (sort === 'price_desc') all.sort((a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity))
+                if (sort === 'newest') all.reverse()
+
+                // Paginate
+                const total = all.length
+                const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+                const items = all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+                setFetchState({ properties: items, total, pages, loading: false, error: null })
             })
-            .catch(err => { if (!cancelled) setError(err.message) })
-            .finally(() => { if (!cancelled) setLoading(false) })
+            .catch(err => {
+                if (!cancelled) setFetchState(prev => ({ ...prev, loading: false, error: err.message }))
+            })
 
         return () => { cancelled = true }
-    }, [pathname, page, propertyType, currency, minPrice, maxPrice, bedrooms, bathrooms, search, sort])
+    }, [config, page, propertyType, currency, minPrice, maxPrice, bedrooms, bathrooms, search, sort, retryCount])
 
     function handleSearch(e) {
         e.preventDefault()
@@ -182,8 +257,7 @@ export default function PropertyListingPage() {
     }
 
     function clearAll() {
-        setPropertyType(''); setCurrency(''); setMinPrice(''); setMaxPrice('')
-        setBedrooms(''); setBathrooms(''); setSearch(''); setSearchDraft(''); setPage(1)
+        dispatch({ type: 'CLEAR', payload: initFilters(new URLSearchParams()) })
     }
 
     function scrollToTop() {
@@ -487,7 +561,7 @@ export default function PropertyListingPage() {
                 {loading ? (
                     <LoadingGrid />
                 ) : error ? (
-                    <ErrorState message={error} onRetry={fetchProperties} />
+                    <ErrorState message={error} onRetry={() => setRetryCount(c => c + 1)} />
                 ) : properties.length === 0 ? (
                     <EmptyState onClear={activeFilterCount > 0 ? clearAll : null} />
                 ) : (

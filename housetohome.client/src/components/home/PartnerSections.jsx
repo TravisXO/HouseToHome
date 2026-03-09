@@ -6,7 +6,7 @@ const RED = '#e92026'
 const PARTNERS = [
     {
         name: 'Malisa & Partners',
-        logo: '/src/assets/malisa_&_partners.png',
+        logo: '/public/assets/malisa_&_partners.png',
         href: 'https://www.malisaandpartners.law/',
         description: 'Legal Partners',
     },

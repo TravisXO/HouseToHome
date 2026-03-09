@@ -23,6 +23,18 @@ function routeLabel(listingType, propertyStatus) {
     return 'Residential Sale'
 }
 
+// ─── Image resolver ───────────────────────────────────────────────────────────
+function resolveImg(img) {
+    if (!img) return ''
+    const raw = (typeof img === 'string') ? img : (img.src || img.slug || img.Slug || '')
+    if (!raw) return ''
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw
+    const wixMatch = raw.match(/wix:image:\/\/v1\/([^/]+)\//)
+    const s = wixMatch ? wixMatch[1] : raw
+    if (!s || s.includes('://')) return ''
+    return `https://static.wixstatic.com/media/${s}`
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function Badge({ children, variant = 'blue' }) {
@@ -99,7 +111,7 @@ function Gallery({ images }) {
             >
                 <img
                     key={active}
-                    src={main.slug}
+                    src={resolveImg(main)}
                     alt={main.alt || 'Property image'}
                     style={{
                         width: '100%', height: '100%', objectFit: 'cover',
@@ -136,7 +148,7 @@ function Gallery({ images }) {
                             }}
                         >
                             <img
-                                src={img.slug}
+                                src={resolveImg(img)}
                                 alt={img.alt || ''}
                                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                             />
@@ -156,7 +168,7 @@ function Gallery({ images }) {
                     }}
                 >
                     <img
-                        src={main.slug}
+                        src={resolveImg(main)}
                         alt={main.alt || ''}
                         style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }}
                         onClick={e => e.stopPropagation()}
@@ -357,11 +369,39 @@ export default function PropertyDetailPage() {
         let cancelled = false
         const load = async () => {
             try {
-                const r = await fetch(`/api/properties/${slug}`)
-                if (!r.ok) throw new Error(r.status === 404 ? 'Property not found.' : 'Failed to load property.')
-                const data = await r.json()
+                const r = await fetch('/api/admin/properties')
+                if (!r.ok) throw new Error('Failed to load properties.')
+                const all = await r.json()
+                // Find by slug field first, then fall back to ID
+                const raw = all.find(p =>
+                    (p.Slug && p.Slug === decodeURIComponent(slug)) ||
+                    (p.ID && p.ID === decodeURIComponent(slug))
+                )
+                if (!raw) throw new Error('Property not found.')
                 if (!cancelled) {
-                    setProperty(data)
+                    // Normalise raw Wix JSON → shape the rest of the page expects
+                    const arrFirst = (val, fb = '') => Array.isArray(val) ? val[0] || fb : val || fb
+                    const lt = arrFirst(raw['Listing Type'], 'Rent')
+                    setProperty({
+                        id: raw.ID || '',
+                        slug: raw.Slug?.trim() || raw.ID || '',
+                        title: raw.Title?.trim() || '',
+                        location: raw.Location?.trim() || '',
+                        listingType: lt.toLowerCase() === 'buy' ? 'Sale' : lt,
+                        propertyStatus: arrFirst(raw['Propety Status'], 'Residential'),
+                        propertyType: arrFirst(raw['Property Type'], 'House'),
+                        furnishingStatus: arrFirst(raw['Furnishing Status'], ''),
+                        bedrooms: raw.Bedrooms ?? null,
+                        bathrooms: raw.Bathroom ?? null,
+                        lotSize: raw['Lot Size']?.trim() || '',
+                        currency: arrFirst(raw.Currency, '$'),
+                        pricingLabel: raw.Pricing?.trim() || '',
+                        amenities: raw.Ammenities?.trim() || '',
+                        addressFormatted: raw.Location?.trim() || '',
+                        images: raw['Property Image'] || [],
+                        latitude: null,
+                        longitude: null,
+                    })
                     setLoading(false)
                     setError(null)
                 }

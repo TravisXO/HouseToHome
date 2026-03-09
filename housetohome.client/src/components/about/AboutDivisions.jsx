@@ -109,7 +109,7 @@ export default function AboutDivisions() {
                         transition: 'all 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.15s',
                     }}>
                         <img
-                            src="/src/assets/divisions-landscape.jpg"
+                            src="/public/assets/divisions-landscape.jpg"
                             alt="H2H Divisions"
                             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                             onError={e => { e.currentTarget.style.display = 'none' }}

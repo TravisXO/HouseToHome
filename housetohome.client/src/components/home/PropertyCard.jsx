@@ -19,99 +19,76 @@ const MapPinIcon = () => (
     </svg>
 )
 
-export default function PropertyCard({ property }) {
+const formatPrice = (pricing, currency) => {
+    if (!pricing) return 'Price on Request'
+    // If the pricing label is already formatted (e.g. "$1,500/month"), use it as-is
+    if (pricing.includes('$') || pricing.toLowerCase().includes('k')) return pricing
+    const num = Number(String(pricing).replace(/[^0-9.]/g, ''))
+    if (!num) return pricing
+    return currency === '$' ? `$${num.toLocaleString()}` : `K ${num.toLocaleString()}`
+}
+
+export default function PropertyCard({ property, resolveThumb }) {
     const {
         id,
-        image,
         title,
-        neighbourhood,
-        price,
-        currency = 'USD',
-        listingType = 'rent',
+        location,
+        listingType,
         propertyType,
         bedrooms,
         bathrooms,
-        href = '#',
+        currency,
+        pricing,
+        images,
     } = property
 
-    const formatPrice = (price, currency) => {
-        if (!price) return 'Price on Request'
-        const formatted = Number(price).toLocaleString()
-        return currency === 'USD' ? `$${formatted}` : `K ${formatted}`
-    }
+    const thumb = resolveThumb(images?.[0])
+    const isRent = listingType?.toLowerCase() === 'rent'
+
+    // Navigate to detail page using the Wix ID
+    const href = id ? `/property/${encodeURIComponent(id)}` : '#'
 
     return (
         <div
             className="property-card"
             style={{
-                background: '#fff',
-                borderRadius: '12px',
-                overflow: 'hidden',
+                background: '#fff', borderRadius: '12px', overflow: 'hidden',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.07)',
                 transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                flexShrink: 0,
-                width: '100%',
-                cursor: 'pointer',
+                width: '100%', cursor: 'pointer',
             }}
-            onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateY(-6px)'
-                e.currentTarget.style.boxShadow = `0 16px 48px rgba(11,105,156,0.14)`
-            }}
-            onMouseLeave={e => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.07)'
-            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = `0 16px 48px rgba(11,105,156,0.14)` }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.07)' }}
         >
             <a href={href} style={{ textDecoration: 'none', display: 'block' }}>
 
                 {/* ── Image ── */}
                 <div className="property-card-image" style={{ position: 'relative', height: '210px', overflow: 'hidden', background: `linear-gradient(135deg, ${BLUE}33, #0a4f7822)` }}>
-                    <img
-                        src={image || '/src/assets/property-placeholder.jpg'}
-                        alt={title}
-                        style={{
-                            width: '100%', height: '100%', objectFit: 'cover', display: 'block',
-                            transition: 'transform 0.5s ease',
-                        }}
-                        onError={e => { e.currentTarget.style.display = 'none' }}
-                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.06)'}
-                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-                    />
+                    {thumb ? (
+                        <img
+                            src={thumb}
+                            alt={title}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.5s ease' }}
+                            onError={e => { e.currentTarget.style.display = 'none' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)' }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                        />
+                    ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.4)' }}>
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+                            </svg>
+                        </div>
+                    )}
 
                     {/* Listing type badge */}
-                    <div style={{
-                        position: 'absolute',
-                        top: '12px',
-                        left: '12px',
-                        padding: '5px 12px',
-                        borderRadius: '50px',
-                        background: listingType === 'rent' ? BLUE : RED,
-                        color: '#fff',
-                        fontFamily: "'Schibsted Grotesk', sans-serif",
-                        fontSize: '10.5px',
-                        fontWeight: 700,
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                    }}>
-                        For {listingType === 'rent' ? 'Rent' : 'Sale'}
+                    <div style={{ position: 'absolute', top: '12px', left: '12px', padding: '5px 12px', borderRadius: '50px', background: isRent ? BLUE : RED, color: '#fff', fontFamily: "'Schibsted Grotesk', sans-serif", fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                        For {isRent ? 'Rent' : 'Sale'}
                     </div>
 
                     {/* Property type badge */}
                     {propertyType && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '12px',
-                            right: '12px',
-                            padding: '5px 12px',
-                            borderRadius: '50px',
-                            background: 'rgba(0,0,0,0.55)',
-                            backdropFilter: 'blur(6px)',
-                            color: '#fff',
-                            fontFamily: "'Schibsted Grotesk', sans-serif",
-                            fontSize: '10.5px',
-                            fontWeight: 600,
-                            letterSpacing: '0.06em',
-                        }}>
+                        <div style={{ position: 'absolute', top: '12px', right: '12px', padding: '5px 12px', borderRadius: '50px', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', color: '#fff', fontFamily: "'Schibsted Grotesk', sans-serif", fontSize: '10.5px', fontWeight: 600, letterSpacing: '0.06em' }}>
                             {propertyType}
                         </div>
                     )}
@@ -120,101 +97,44 @@ export default function PropertyCard({ property }) {
                 {/* ── Body ── */}
                 <div style={{ padding: '18px 20px 20px' }}>
 
-                    {/* Location */}
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        color: '#999',
-                        fontFamily: "'Schibsted Grotesk', sans-serif",
-                        fontSize: '12px',
-                        marginBottom: '8px',
-                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#999', fontFamily: "'Schibsted Grotesk', sans-serif", fontSize: '12px', marginBottom: '8px' }}>
                         <MapPinIcon />
-                        <span>{neighbourhood || 'Lusaka, Zambia'}</span>
+                        <span>{location || 'Lusaka, Zambia'}</span>
                     </div>
 
-                    {/* Title */}
-                    <h3 style={{
-                        fontFamily: "'Fraunces', serif",
-                        fontSize: '17px',
-                        fontWeight: 600,
-                        color: '#111',
-                        margin: '0 0 14px 0',
-                        lineHeight: 1.3,
-                        letterSpacing: '-0.01em',
-                    }}>
+                    <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: '17px', fontWeight: 600, color: '#111', margin: '0 0 14px 0', lineHeight: 1.3, letterSpacing: '-0.01em' }}>
                         {title}
                     </h3>
 
-                    {/* Divider */}
                     <div style={{ height: '1px', background: '#f0f0f0', marginBottom: '14px' }} />
 
-                    {/* Footer row */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-
-                        {/* Price */}
                         <div>
-                            <div style={{
-                                fontFamily: "'Fraunces', serif",
-                                fontSize: '19px',
-                                fontWeight: 700,
-                                color: BLUE,
-                                lineHeight: 1,
-                            }}>
-                                {formatPrice(price, currency)}
+                            <div style={{ fontFamily: "'Fraunces', serif", fontSize: '19px', fontWeight: 700, color: BLUE, lineHeight: 1 }}>
+                                {formatPrice(pricing, currency)}
                             </div>
-                            {listingType === 'rent' && (
-                                <div style={{
-                                    fontFamily: "'Schibsted Grotesk', sans-serif",
-                                    fontSize: '10.5px',
-                                    color: '#aaa',
-                                    marginTop: '2px',
-                                }}>/month</div>
+                            {isRent && (
+                                <div style={{ fontFamily: "'Schibsted Grotesk', sans-serif", fontSize: '10.5px', color: '#aaa', marginTop: '2px' }}>/month</div>
                             )}
                         </div>
 
-                        {/* Bed / Bath */}
                         {(bedrooms || bathrooms) && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 {bedrooms && (
-                                    <div style={{
-                                        display: 'flex', alignItems: 'center', gap: '4px',
-                                        fontFamily: "'Schibsted Grotesk', sans-serif",
-                                        fontSize: '12.5px', fontWeight: 600, color: '#555',
-                                    }}>
-                                        <BedIcon />
-                                        {bedrooms}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontFamily: "'Schibsted Grotesk', sans-serif", fontSize: '12.5px', fontWeight: 600, color: '#555' }}>
+                                        <BedIcon /> {bedrooms}
                                     </div>
                                 )}
                                 {bathrooms && (
-                                    <div style={{
-                                        display: 'flex', alignItems: 'center', gap: '4px',
-                                        fontFamily: "'Schibsted Grotesk', sans-serif",
-                                        fontSize: '12.5px', fontWeight: 600, color: '#555',
-                                    }}>
-                                        <BathIcon />
-                                        {bathrooms}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontFamily: "'Schibsted Grotesk', sans-serif", fontSize: '12.5px', fontWeight: 600, color: '#555' }}>
+                                        <BathIcon /> {bathrooms}
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
 
-                    {/* View listing link */}
-                    <div style={{
-                        marginTop: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        color: BLUE,
-                        fontFamily: "'Schibsted Grotesk', sans-serif",
-                        fontSize: '12.5px',
-                        fontWeight: 700,
-                        letterSpacing: '0.04em',
-                        borderTop: '1px solid #f0f0f0',
-                        paddingTop: '14px',
-                    }}>
+                    <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '6px', color: BLUE, fontFamily: "'Schibsted Grotesk', sans-serif", fontSize: '12.5px', fontWeight: 700, letterSpacing: '0.04em', borderTop: '1px solid #f0f0f0', paddingTop: '14px' }}>
                         View Listing
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
@@ -223,25 +143,10 @@ export default function PropertyCard({ property }) {
                 </div>
             </a>
 
-            {/* Responsive styles */}
             <style>{`
-
-                /* ── 1024px – 769px (tablet landscape) ── */
-                @media (max-width: 1024px) and (min-width: 769px) {
-                    .property-card-image { height: 190px !important; }
-                }
-
-                /* ── 768px – 480px (tablet portrait) ── */
-                @media (max-width: 768px) and (min-width: 481px) {
-                    .property-card-image { height: 200px !important; }
-                }
-
-                /* ── 480px – 0px (mobile) ── */
-                @media (max-width: 480px) {
-                    .property-card-image { height: 220px !important; }
-                    .property-card { border-radius: 10px !important; }
-                }
-
+                @media (max-width: 1024px) and (min-width: 769px) { .property-card-image { height: 190px !important; } }
+                @media (max-width: 768px)  and (min-width: 481px) { .property-card-image { height: 200px !important; } }
+                @media (max-width: 480px)  { .property-card-image { height: 220px !important; } .property-card { border-radius: 10px !important; } }
             `}</style>
         </div>
     )

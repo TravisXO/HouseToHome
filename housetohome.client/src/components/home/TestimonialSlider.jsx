@@ -2,30 +2,31 @@
 
 const BLUE = '#0b699c'
 const RED = '#e92026'
+const DARK = '#0a2540'
 
 const TESTIMONIALS = [
     {
         id: 1,
         name: 'Chisanga Mwangulukulu',
-        review: 'The services rendered here are top tier. From helping me find exactly what I\'m looking for to matching my preferences to my budget, the team was well prepared to assist me. I\'m forever grateful!',
+        review: "The services rendered here are top tier. From helping me find exactly what I'm looking for to matching my preferences to my budget, the team was well prepared to assist me. I'm forever grateful!",
         initials: 'CM',
     },
     {
         id: 2,
         name: 'Taonga Luma',
-        review: 'I can\'t recommend House to Home highly enough! They have been fundamental in helping me find the perfect apartment to rent in Lusaka, making the entire process smooth and stress-free. Their team is professional, knowledgeable, and truly dedicated to understanding my needs. Beyond rentals, House to Home has also been an incredible partner in my property development journey.',
+        review: "I can't recommend House to Home highly enough! They have been fundamental in helping me find the perfect apartment to rent in Lusaka, making the entire process smooth and stress-free. Their team is professional, knowledgeable, and truly dedicated to understanding my needs. Beyond rentals, House to Home has also been an incredible partner in my property development journey.",
         initials: 'TL',
     },
     {
         id: 3,
         name: 'Tinkhe Banda',
-        review: 'I\'ve had the pleasure of working with the exceptional team at House to Home Properties, and I can confidently attest to their professionalism, expertise, and genuine care for their clients. They took the time to understand my needs and delivered exceptional results, finding me the perfect property.',
+        review: "I've had the pleasure of working with the exceptional team at House to Home Properties, and I can confidently attest to their professionalism, expertise, and genuine care for their clients. They took the time to understand my needs and delivered exceptional results, finding me the perfect property.",
         initials: 'TB',
     },
     {
         id: 4,
         name: 'lenius situnyama',
-        review: 'I am pleased to express our sincere appreciation for the exceptional estate agency services provided by House to Home. Their professionalism, efficiency, and dedication to excellence have significantly contributed to the seamless management of our properties. House to Home has demonstrated a deep understanding of the real estate market, ensuring that our properties are well-positioned and occupied by reliable tenants.',
+        review: "I am pleased to express our sincere appreciation for the exceptional estate agency services provided by House to Home. Their professionalism, efficiency, and dedication to excellence have significantly contributed to the seamless management of our properties. House to Home has demonstrated a deep understanding of the real estate market, ensuring that our properties are well-positioned and occupied by reliable tenants.",
         initials: 'LS',
     },
     {
@@ -105,30 +106,29 @@ const StarIcon = () => (
     </svg>
 )
 
+// ── Testimonial Card ──────────────────────────────────────────────────────
 function TestimonialCard({ testimonial, isCenter }) {
     return (
-        <div
-            style={{
-                background: isCenter
-                    ? `linear-gradient(145deg, ${BLUE} 0%, #0a4f78 100%)`
-                    : '#fff',
-                borderRadius: '16px',
-                padding: '36px 32px',
-                boxShadow: isCenter
-                    ? `0 24px 64px rgba(11,105,156,0.25)`
-                    : '0 4px 20px rgba(0,0,0,0.07)',
-                border: isCenter ? 'none' : '1px solid #efefef',
-                flex: '0 0 calc(33.333% - 16px)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '20px',
-                transform: isCenter ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)',
-                transition: 'all 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
-                position: 'relative',
-                overflow: 'hidden',
-            }}
-        >
-            {/* Red top accent on center card */}
+        <div style={{
+            background: isCenter
+                ? `linear-gradient(145deg, ${DARK} 0%, #0e3a6e 100%)`
+                : '#fff',
+            borderRadius: '20px',
+            padding: '32px 28px',
+            boxShadow: isCenter
+                ? `0 24px 64px rgba(10,37,64,0.32), 0 0 0 1px rgba(11,105,156,0.3)`
+                : '0 2px 16px rgba(0,0,0,0.055)',
+            border: isCenter ? 'none' : '1px solid rgba(0,0,0,0.055)',
+            flex: `0 0 calc(33.333% - 16px)`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px',
+            transform: isCenter ? 'translateY(-10px) scale(1.025)' : 'translateY(0) scale(1)',
+            transition: 'all 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
+            position: 'relative',
+            overflow: 'hidden',
+        }}>
+            {/* Top accent line on center card */}
             {isCenter && (
                 <div style={{
                     position: 'absolute', top: 0, left: 0, right: 0,
@@ -137,8 +137,23 @@ function TestimonialCard({ testimonial, isCenter }) {
                 }} />
             )}
 
+            {/* Decorative large initials watermark */}
+            <div style={{
+                position: 'absolute',
+                bottom: -10, right: -4,
+                fontFamily: "'Fraunces', serif",
+                fontSize: '100px',
+                fontWeight: 700,
+                color: isCenter ? 'rgba(255,255,255,0.03)' : 'rgba(11,105,156,0.04)',
+                lineHeight: 1,
+                userSelect: 'none',
+                pointerEvents: 'none',
+            }}>
+                {testimonial.initials}
+            </div>
+
             {/* Quote icon */}
-            <div style={{ color: isCenter ? 'rgba(255,255,255,0.15)' : `${BLUE}18` }}>
+            <div style={{ color: isCenter ? 'rgba(255,255,255,0.12)' : `${BLUE}20` }}>
                 <QuoteIcon />
             </div>
 
@@ -151,7 +166,7 @@ function TestimonialCard({ testimonial, isCenter }) {
             <p style={{
                 fontFamily: "'Schibsted Grotesk', sans-serif",
                 fontSize: '14.5px',
-                color: isCenter ? 'rgba(255,255,255,0.85)' : '#555',
+                color: isCenter ? 'rgba(255,255,255,0.82)' : '#4a5568',
                 lineHeight: 1.8,
                 margin: 0,
                 flex: 1,
@@ -163,14 +178,20 @@ function TestimonialCard({ testimonial, isCenter }) {
                 "{testimonial.review}"
             </p>
 
-            {/* Reviewer */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingTop: '16px', borderTop: isCenter ? '1px solid rgba(255,255,255,0.15)' : '1px solid #f0f0f0' }}>
+            {/* Reviewer row */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                paddingTop: '16px',
+                borderTop: isCenter ? '1px solid rgba(255,255,255,0.12)' : '1px solid #f1f5f9',
+            }}>
                 {/* Avatar */}
                 <div style={{
                     width: '44px', height: '44px',
                     borderRadius: '50%',
-                    background: isCenter ? 'rgba(255,255,255,0.15)' : `${BLUE}15`,
-                    border: isCenter ? '2px solid rgba(255,255,255,0.25)' : `2px solid ${BLUE}20`,
+                    background: isCenter ? 'rgba(255,255,255,0.12)' : `${BLUE}14`,
+                    border: isCenter ? `2px solid rgba(255,255,255,0.2)` : `2px solid ${BLUE}22`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontFamily: "'Fraunces', serif",
                     fontSize: '15px',
@@ -185,21 +206,28 @@ function TestimonialCard({ testimonial, isCenter }) {
                         fontFamily: "'Schibsted Grotesk', sans-serif",
                         fontSize: '14px',
                         fontWeight: 700,
-                        color: isCenter ? '#fff' : '#111',
+                        color: isCenter ? '#fff' : DARK,
                         marginBottom: '2px',
-                    }}>{testimonial.name}</div>
+                    }}>
+                        {testimonial.name}
+                    </div>
                     <div style={{
                         fontFamily: "'Schibsted Grotesk', sans-serif",
-                        fontSize: '11.5px',
-                        color: isCenter ? RED : '#aaa',
-                        fontWeight: 500,
-                    }}>Verified Client</div>
+                        fontSize: '11px',
+                        color: isCenter ? 'rgba(255,255,255,0.25)' : '#94a3b8',
+                        fontWeight: 600,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                    }}>
+                        Verified Client
+                    </div>
                 </div>
             </div>
         </div>
     )
 }
 
+// ── Main Component ────────────────────────────────────────────────────────
 export default function TestimonialsSlider() {
     const [activeIndex, setActiveIndex] = useState(1)
     const [isPaused, setIsPaused] = useState(false)
@@ -241,39 +269,41 @@ export default function TestimonialsSlider() {
         <section
             ref={sectionRef}
             className="testimonials-section"
-            style={{ background: '#f9f9f9', padding: '100px 0', overflow: 'hidden' }}
+            style={{ background: '#f7f9fc', padding: '100px 0', overflow: 'hidden' }}
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
         >
             <div className="testimonials-container" style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 48px' }}>
 
                 {/* ── Header ── */}
-                <div
-                    style={{
-                        textAlign: 'center',
-                        marginBottom: '64px',
-                        opacity: visible ? 1 : 0,
-                        transform: visible ? 'translateY(0)' : 'translateY(24px)',
-                        transition: 'all 0.7s cubic-bezier(0.22, 1, 0.36, 1)',
-                    }}
-                >
+                <div style={{
+                    textAlign: 'center',
+                    marginBottom: '64px',
+                    opacity: visible ? 1 : 0,
+                    transform: visible ? 'translateY(0)' : 'translateY(24px)',
+                    transition: 'all 0.7s cubic-bezier(0.22, 1, 0.36, 1)',
+                }}>
+                    {/* Eyebrow */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '12px' }}>
-                        <div style={{ width: '32px', height: '2px', background: RED, borderRadius: '2px' }} />
+                        <div style={{ width: '28px', height: '2px', background: RED, borderRadius: '2px' }} />
                         <span style={{
                             fontFamily: "'Schibsted Grotesk', sans-serif",
-                            fontSize: '11.5px',
+                            fontSize: '11px',
                             fontWeight: 700,
                             color: RED,
                             letterSpacing: '0.14em',
                             textTransform: 'uppercase',
-                        }}>Testimonials</span>
-                        <div style={{ width: '32px', height: '2px', background: RED, borderRadius: '2px' }} />
+                        }}>
+                            Testimonials
+                        </span>
+                        <div style={{ width: '28px', height: '2px', background: RED, borderRadius: '2px' }} />
                     </div>
+
                     <h2 style={{
                         fontFamily: "'Fraunces', serif",
                         fontSize: 'clamp(1.8rem, 3vw, 2.5rem)',
                         fontWeight: 700,
-                        color: '#111',
+                        color: DARK,
                         margin: '0 0 16px 0',
                         letterSpacing: '-0.02em',
                         lineHeight: 1.15,
@@ -281,10 +311,11 @@ export default function TestimonialsSlider() {
                         What Our{' '}
                         <span style={{ color: BLUE }}>Clients Say</span>
                     </h2>
+
                     <p style={{
                         fontFamily: "'Schibsted Grotesk', sans-serif",
-                        fontSize: '15.5px',
-                        color: '#888',
+                        fontSize: '15px',
+                        color: '#64748b',
                         maxWidth: '440px',
                         margin: '0 auto',
                         lineHeight: 1.7,
@@ -334,6 +365,7 @@ export default function TestimonialsSlider() {
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             transition: 'all 0.2s ease',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                            flexShrink: 0,
                         }}
                         onMouseEnter={e => { e.currentTarget.style.background = BLUE; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = BLUE }}
                         onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = BLUE; e.currentTarget.style.borderColor = `${BLUE}30` }}
@@ -378,6 +410,7 @@ export default function TestimonialsSlider() {
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             transition: 'all 0.2s ease',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                            flexShrink: 0,
                         }}
                         onMouseEnter={e => { e.currentTarget.style.background = BLUE; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = BLUE }}
                         onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = BLUE; e.currentTarget.style.borderColor = `${BLUE}30` }}
@@ -391,7 +424,15 @@ export default function TestimonialsSlider() {
 
                 {/* Progress bar */}
                 {!isPaused && (
-                    <div style={{ marginTop: '16px', height: '2px', background: `${BLUE}12`, borderRadius: '2px', overflow: 'hidden', maxWidth: '200px', margin: '16px auto 0' }}>
+                    <div style={{
+                        marginTop: '16px',
+                        height: '2px',
+                        background: `${BLUE}12`,
+                        borderRadius: '2px',
+                        overflow: 'hidden',
+                        maxWidth: '200px',
+                        margin: '16px auto 0',
+                    }}>
                         <div
                             key={activeIndex}
                             style={{
@@ -408,17 +449,15 @@ export default function TestimonialsSlider() {
             <style>{`
                 @keyframes tsProgress {
                     from { width: 0%; }
-                    to { width: 100%; }
+                    to   { width: 100%; }
                 }
 
                 /* ── 1024px – 769px (tablet landscape) ── */
                 @media (max-width: 1024px) and (min-width: 769px) {
-                    .testimonials-section { padding: 80px 0 !important; }
+                    .testimonials-section   { padding: 80px 0 !important; }
                     .testimonials-container { padding: 0 32px !important; }
                     .testimonials-cards > :first-child,
-                    .testimonials-cards > :last-child {
-                        display: none !important;
-                    }
+                    .testimonials-cards > :last-child { display: none !important; }
                     .testimonials-cards > :nth-child(2) {
                         flex: 0 0 100% !important;
                         max-width: 560px;
@@ -427,14 +466,12 @@ export default function TestimonialsSlider() {
                     }
                 }
 
-                /* ── 768px – 480px (tablet portrait) ── */
+                /* ── 768px – 481px (tablet portrait) ── */
                 @media (max-width: 768px) and (min-width: 481px) {
-                    .testimonials-section { padding: 70px 0 !important; }
+                    .testimonials-section   { padding: 70px 0 !important; }
                     .testimonials-container { padding: 0 28px !important; }
                     .testimonials-cards > :first-child,
-                    .testimonials-cards > :last-child {
-                        display: none !important;
-                    }
+                    .testimonials-cards > :last-child { display: none !important; }
                     .testimonials-cards > :nth-child(2) {
                         flex: 0 0 100% !important;
                         max-width: 520px;
@@ -445,18 +482,15 @@ export default function TestimonialsSlider() {
 
                 /* ── 480px – 0px (mobile) ── */
                 @media (max-width: 480px) {
-                    .testimonials-section { padding: 60px 0 !important; }
+                    .testimonials-section   { padding: 60px 0 !important; }
                     .testimonials-container { padding: 0 20px !important; }
                     .testimonials-cards > :first-child,
-                    .testimonials-cards > :last-child {
-                        display: none !important;
-                    }
+                    .testimonials-cards > :last-child { display: none !important; }
                     .testimonials-cards > :nth-child(2) {
                         flex: 0 0 100% !important;
                         transform: translateY(0) scale(1) !important;
                     }
                 }
-
             `}</style>
         </section>
     )

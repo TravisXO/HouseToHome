@@ -19,6 +19,7 @@ const PartnersSection = lazy(() => import('./components/home/PartnerSections'))
 const AboutPage = lazy(() => import('./pages/AboutPage'))
 const PropertyListingPage = lazy(() => import('./pages/PropertyListingPage'))
 const PropertyDetailPage = lazy(() => import('./pages/PropertyDetailPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
 
 // Minimal spinner shown while a lazy chunk downloads (~200ms on first visit)
 function PageSkeleton() {
@@ -75,6 +76,9 @@ function App() {
 
                     {/* Property Detail */}
                     <Route path="/properties/:slug" element={<PropertyDetailPage />} />
+
+                    {/* Admin / CMS */}
+                    <Route path="/admin" element={<AdminPage />} />
                 </Routes>
             </Suspense>
             <Footer />

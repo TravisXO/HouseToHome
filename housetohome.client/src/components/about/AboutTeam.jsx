@@ -10,7 +10,7 @@ const TEAM = [
         ziea: 'ZIEA No. 884',
         phone: '+260 965 127 888',
         email: 'ruslana@housetohomezambia.com',
-        image: '/src/assets/team-ruslana.jpg',
+        image: '/public/assets/team-ruslana.jpg',
         initials: 'RT',
         featured: true,
     },
@@ -20,7 +20,7 @@ const TEAM = [
         ziea: 'ZIEA No. 894',
         phone: '+260 966 574 377',
         email: 'james@housetohomezambia.com',
-        image: '/src/assets/team-james.jpg',
+        image: '/public/assets/team-james.jpg',
         initials: 'JB',
     },
     {
@@ -29,7 +29,7 @@ const TEAM = [
         ziea: 'ZIEA No. 111',
         phone: '+260 979 818 280',
         email: 'raphael@housetohomezambia.com',
-        image: '/src/assets/team-raphael.jpg',
+        image: '/public/assets/team-raphael.jpg',
         initials: 'RB',
     },
 ]

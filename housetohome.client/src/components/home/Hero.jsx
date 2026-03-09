@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const BLUE = '#0b699c'
 const RED = '#e92026'
@@ -94,6 +95,8 @@ export default function Hero() {
     const [bedrooms, setBedrooms] = useState('')
     const [bathrooms, setBathrooms] = useState('')
 
+    const navigate = useNavigate()
+
     useEffect(() => {
         const t1 = setTimeout(() => setHeadlineVisible(true), 300)
         const t2 = setTimeout(() => setBannerVisible(true), 600)
@@ -122,6 +125,34 @@ export default function Hero() {
             videoRef.current.play().catch(() => { })
         }
     }, [queue, currentIndex])
+
+    // ── Derive the best route from listingType + propertyType ──────────────
+    function resolveRoute() {
+        if (listingType === 'rent') {
+            return (propertyType === 'Commercial' || propertyType === 'Industrial')
+                ? '/commercial-rent'
+                : '/residential-rent'
+        }
+        // sale
+        if (propertyType === 'Vacant Land' || propertyType === 'Farm') return '/land-sale'
+        if (propertyType === 'Commercial' || propertyType === 'Industrial') return '/commercial-sale'
+        return '/residential-sale'
+    }
+
+    // ── Navigate to the listing page with filters as query params ──────────
+    function handleHeroSearch() {
+        const route = resolveRoute()
+        const params = new URLSearchParams()
+        if (searchQuery) params.set('q', searchQuery)
+        if (propertyType) params.set('propertyType', propertyType)
+        if (currency) params.set('currency', currency)
+        if (minPrice) params.set('minPrice', minPrice)
+        if (maxPrice) params.set('maxPrice', maxPrice)
+        if (bedrooms) params.set('bedrooms', bedrooms.replace('+', ''))
+        if (bathrooms) params.set('bathrooms', bathrooms.replace('+', ''))
+        const qs = params.toString()
+        navigate(qs ? `${route}?${qs}` : route)
+    }
 
     const inputStyle = {
         width: '100%',
@@ -477,6 +508,7 @@ export default function Hero() {
 
                                 {/* ── Search Button ── */}
                                 <button
+                                    onClick={handleHeroSearch}
                                     style={{
                                         width: '100%',
                                         padding: '12px',
