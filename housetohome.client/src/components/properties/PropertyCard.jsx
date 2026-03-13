@@ -8,7 +8,7 @@ const RED = '#e92026'
 // Handles: Cloudinary HTTPS, plain HTTPS, legacy Wix slugs/URIs.
 function resolveImg(img) {
     if (!img) return null
-    const raw = (typeof img === 'string') ? img : (img.src || img.slug || img.Slug || '')
+    const raw = (typeof img === 'string') ? img : (img.secureUrl || img.src || img.slug || img.Slug || '')
     if (!raw) return null
     if (raw.startsWith('http://') || raw.startsWith('https://')) return raw
     const wixMatch = raw.match(/wix:image:\/\/v1\/([^/]+)\//)

@@ -232,7 +232,29 @@ export default function TestimonialsSlider() {
     const [activeIndex, setActiveIndex] = useState(1)
     const [isPaused, setIsPaused] = useState(false)
     const [visible, setVisible] = useState(false)
+    const [allTestimonials, setAllTestimonials] = useState(TESTIMONIALS)
     const sectionRef = useRef(null)
+
+    // Merge server-persisted testimonials with hardcoded ones
+    useEffect(() => {
+        fetch('/api/testimonials')
+            .then(r => r.ok ? r.json() : [])
+            .then(data => {
+                if (data.length > 0) {
+                    setAllTestimonials([
+                        ...TESTIMONIALS,
+                        ...data.map(t => ({
+                            id: t.id,
+                            name: t.name,
+                            review: t.review,
+                            initials: t.initials,
+                            rating: t.rating ?? 5,
+                        }))
+                    ])
+                }
+            })
+            .catch(() => { })
+    }, [])
 
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -244,7 +266,7 @@ export default function TestimonialsSlider() {
     }, [])
 
     const goTo = useCallback((index) => {
-        setActiveIndex(((index % TESTIMONIALS.length) + TESTIMONIALS.length) % TESTIMONIALS.length)
+        setActiveIndex(((index % allTestimonials.length) + allTestimonials.length) % allTestimonials.length)
     }, [])
 
     useEffect(() => {
@@ -255,11 +277,11 @@ export default function TestimonialsSlider() {
 
     // Get 3 consecutive testimonials centred on activeIndex
     const getVisible = () => {
-        const n = TESTIMONIALS.length
+        const n = allTestimonials.length
         return [
-            TESTIMONIALS[(activeIndex - 1 + n) % n],
-            TESTIMONIALS[activeIndex],
-            TESTIMONIALS[(activeIndex + 1) % n],
+            allTestimonials[(activeIndex - 1 + n) % n],
+            allTestimonials[activeIndex],
+            allTestimonials[(activeIndex + 1) % n],
         ]
     }
 
@@ -378,7 +400,7 @@ export default function TestimonialsSlider() {
 
                     {/* Dot indicators */}
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        {TESTIMONIALS.map((_, i) => (
+                        {allTestimonials.map((_, i) => (
                             <button
                                 key={i}
                                 onClick={() => goTo(i)}

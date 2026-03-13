@@ -373,35 +373,66 @@ export default function PropertyDetailPage() {
                 if (!r.ok) throw new Error('Failed to load properties.')
                 const all = await r.json()
                 // Find by slug field first, then fall back to ID
+                const decoded = decodeURIComponent(slug)
                 const raw = all.find(p =>
-                    (p.Slug && p.Slug === decodeURIComponent(slug)) ||
-                    (p.ID && p.ID === decodeURIComponent(slug))
+                    (p.slug && p.slug === decoded) ||
+                    (p.id && p.id === decoded) ||
+                    (p.Slug && p.Slug === decoded) ||
+                    (p.ID && p.ID === decoded)
                 )
                 if (!raw) throw new Error('Property not found.')
                 if (!cancelled) {
-                    // Normalise raw Wix JSON → shape the rest of the page expects
                     const arrFirst = (val, fb = '') => Array.isArray(val) ? val[0] || fb : val || fb
-                    const lt = arrFirst(raw['Listing Type'], 'Rent')
-                    setProperty({
-                        id: raw.ID || '',
-                        slug: raw.Slug?.trim() || raw.ID || '',
-                        title: raw.Title?.trim() || '',
-                        location: raw.Location?.trim() || '',
-                        listingType: lt.toLowerCase() === 'buy' ? 'Sale' : lt,
-                        propertyStatus: arrFirst(raw['Propety Status'], 'Residential'),
-                        propertyType: arrFirst(raw['Property Type'], 'House'),
-                        furnishingStatus: arrFirst(raw['Furnishing Status'], ''),
-                        bedrooms: raw.Bedrooms ?? null,
-                        bathrooms: raw.Bathroom ?? null,
-                        lotSize: raw['Lot Size']?.trim() || '',
-                        currency: arrFirst(raw.Currency, '$'),
-                        pricingLabel: raw.Pricing?.trim() || '',
-                        amenities: raw.Ammenities?.trim() || '',
-                        addressFormatted: raw.Location?.trim() || '',
-                        images: raw['Property Image'] || [],
-                        latitude: null,
-                        longitude: null,
-                    })
+                    const isManaged = raw._source === 'managed' || raw.id !== undefined
+                    let normalised
+                    if (isManaged) {
+                        const lt = raw.listingType || 'Rent'
+                        normalised = {
+                            id: raw.id || '',
+                            slug: raw.slug || raw.id || '',
+                            title: raw.title?.trim() || '',
+                            description: raw.description?.trim() || '',
+                            location: raw.location?.trim() || '',
+                            listingType: lt.toLowerCase() === 'buy' ? 'Sale' : lt,
+                            propertyStatus: raw.propertyStatus || 'Residential',
+                            propertyType: raw.propertyType || 'House',
+                            furnishingStatus: raw.furnishingStatus || '',
+                            bedrooms: raw.bedrooms ?? null,
+                            bathrooms: raw.bathrooms ?? null,
+                            lotSize: raw.lotSize?.trim() || '',
+                            currency: raw.currency || '$',
+                            pricingLabel: raw.pricingLabel?.trim() || '',
+                            amenities: raw.amenities?.trim() || '',
+                            addressFormatted: raw.location?.trim() || '',
+                            images: raw.images || [],
+                            latitude: null,
+                            longitude: null,
+                        }
+                    } else {
+                        const lt = arrFirst(raw['Listing Type'], 'Rent')
+                        normalised = {
+                            id: raw.ID || '',
+                            slug: raw.Slug?.trim() || raw.ID || '',
+                            title: raw.Title?.trim() || '',
+                            description: '',
+                            location: raw.Location?.trim() || '',
+                            listingType: lt.toLowerCase() === 'buy' ? 'Sale' : lt,
+                            propertyStatus: arrFirst(raw['Propety Status'], 'Residential'),
+                            propertyType: arrFirst(raw['Property Type'], 'House'),
+                            furnishingStatus: arrFirst(raw['Furnishing Status'], ''),
+                            bedrooms: raw.Bedrooms ?? null,
+                            bathrooms: raw.Bathroom ?? null,
+                            lotSize: raw['Lot Size']?.trim() || '',
+                            currency: arrFirst(raw.Currency, '$'),
+                            pricingLabel: raw.Pricing?.trim() || '',
+                            amenities: raw.Ammenities?.trim() || '',
+                            addressFormatted: raw.Location?.trim() || '',
+                            images: raw['Property Image'] || [],
+                            latitude: null,
+                            longitude: null,
+                        }
+                    }
+                    setProperty(normalised)
                     setLoading(false)
                     setError(null)
                 }
@@ -608,6 +639,33 @@ export default function PropertyDetailPage() {
                                             <span className="tag-chip">💱 Priced in {property.currency}</span>
                                         )}
                                     </div>
+
+                                    {/* Description */}
+                                    {property.description && (
+                                        <div style={{
+                                            background: '#fff', borderRadius: '14px',
+                                            border: '1.5px solid #e5e7eb', padding: '24px',
+                                            marginBottom: '28px',
+                                            boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                                        }}>
+                                            <h2 style={{
+                                                fontFamily: "'Fraunces', serif", fontWeight: 600,
+                                                fontSize: '1.25rem', color: '#0d1117',
+                                                margin: '0 0 16px',
+                                                paddingBottom: '12px', borderBottom: '1px solid #f0f0f0',
+                                            }}>
+                                                About This Property
+                                            </h2>
+                                            <p style={{
+                                                fontFamily: "'Schibsted Grotesk', sans-serif",
+                                                fontSize: '0.95rem', color: '#374151',
+                                                lineHeight: 1.75, margin: 0,
+                                                whiteSpace: 'pre-line',
+                                            }}>
+                                                {property.description}
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {/* Amenities */}
                                     {property.amenities && (

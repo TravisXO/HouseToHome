@@ -31,6 +31,7 @@ const formatPrice = (pricing, currency) => {
 export default function PropertyCard({ property, resolveThumb }) {
     const {
         id,
+        slug,
         title,
         location,
         listingType,
@@ -45,8 +46,8 @@ export default function PropertyCard({ property, resolveThumb }) {
     const thumb = resolveThumb(images?.[0])
     const isRent = listingType?.toLowerCase() === 'rent'
 
-    // Navigate to detail page using the Wix ID
-    const href = id ? `/property/${encodeURIComponent(id)}` : '#'
+    // Navigate to detail page using slug (managed) or id (legacy)
+    const href = slug ? `/properties/${encodeURIComponent(slug)}` : id ? `/properties/${encodeURIComponent(id)}` : '#'
 
     return (
         <div

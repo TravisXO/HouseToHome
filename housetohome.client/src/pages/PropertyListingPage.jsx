@@ -20,6 +20,34 @@ function parsePrice(label) {
 }
 
 function normaliseProperty(raw) {
+    // Detect format: managed (camelCase) vs legacy Wix (uppercase keys)
+    const isManaged = raw._source === 'managed' || raw.id !== undefined
+
+    if (isManaged) {
+        const pricingLabel = raw.pricingLabel?.trim() || ''
+        const lt = raw.listingType || 'Rent'
+        return {
+            id: raw.id || '',
+            slug: raw.slug?.trim() || raw.id || '',
+            title: raw.title?.trim() || '',
+            location: raw.location?.trim() || '',
+            listingType: lt.toLowerCase() === 'buy' ? 'Sale' : lt,
+            propertyStatus: raw.propertyStatus || 'Residential',
+            propertyType: raw.propertyType || 'House',
+            furnishingStatus: raw.furnishingStatus || '',
+            bedrooms: raw.bedrooms ?? null,
+            bathrooms: raw.bathrooms ?? null,
+            lotSize: raw.lotSize?.trim() || '',
+            currency: raw.currency || '$',
+            pricingLabel,
+            price: parsePrice(pricingLabel),
+            amenities: raw.amenities?.trim() || '',
+            addressFormatted: raw.location?.trim() || '',
+            images: raw.images || [],
+        }
+    }
+
+    // Legacy Wix format
     const lt = arrFirst(raw['Listing Type'], 'Rent')
     const pricingLabel = raw.Pricing?.trim() || ''
     return {
@@ -571,7 +599,7 @@ export default function PropertyListingPage() {
                             gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
                             gap: '28px',
                         }}>
-                            {properties.map(p => <PropertyCard key={p.id} property={p} />)}
+                            {properties.map((p, i) => <PropertyCard key={p.id || p.slug || i} property={p} />)}
                         </div>
 
                         {/* ── Pagination ── */}

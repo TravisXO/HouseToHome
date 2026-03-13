@@ -219,7 +219,7 @@ export default function ServicesSection() {
                                 fontFamily: "'Schibsted Grotesk', sans-serif",
                                 fontSize: '11px',
                                 fontWeight: 700,
-                                color: service.featured ? RED : service.accent,
+                                color: service.featured ? 'rgba(255,255,255)' : service.accent,
                                 letterSpacing: '0.12em',
                                 textTransform: 'uppercase',
                                 marginBottom: '10px',

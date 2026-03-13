@@ -20,6 +20,7 @@ const AboutPage = lazy(() => import('./pages/AboutPage'))
 const PropertyListingPage = lazy(() => import('./pages/PropertyListingPage'))
 const PropertyDetailPage = lazy(() => import('./pages/PropertyDetailPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
+const ContactPage = lazy(() => import('./pages/ContactPage'))
 
 // Minimal spinner shown while a lazy chunk downloads (~200ms on first visit)
 function PageSkeleton() {
@@ -63,6 +64,9 @@ function App() {
 
                     {/* About */}
                     <Route path="/about" element={<AboutPage />} />
+
+                    {/* Contact */}
+                    <Route path="/contact" element={<ContactPage />} />
 
                     {/* Rent */}
                     <Route path="/residential-rent" element={<PropertyListingPage />} />

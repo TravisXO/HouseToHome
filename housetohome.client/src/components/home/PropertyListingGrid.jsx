@@ -12,8 +12,27 @@ function arrFirst(val, fallback) {
 }
 
 function normalise(raw) {
+    const isManaged = raw._source === 'managed' || raw.id !== undefined
+    if (isManaged) {
+        const lt = raw.listingType || 'Rent'
+        return {
+            id: raw.id || '',
+            slug: raw.slug?.trim() || raw.id || '',
+            title: raw.title || '',
+            location: raw.location || '',
+            listingType: lt.toLowerCase() === 'buy' ? 'Sale' : lt,
+            propertyStatus: raw.propertyStatus || 'Residential',
+            propertyType: raw.propertyType || 'House',
+            bedrooms: raw.bedrooms ?? null,
+            bathrooms: raw.bathrooms ?? null,
+            currency: raw.currency || '$',
+            pricing: raw.pricingLabel || '',
+            images: raw.images || [],
+        }
+    }
     return {
         id: raw.ID || '',
+        slug: raw.Slug?.trim() || raw.ID || '',
         title: raw.Title || '',
         location: raw.Location || '',
         listingType: arrFirst(raw['Listing Type'], 'Rent'),
@@ -29,7 +48,7 @@ function normalise(raw) {
 
 // ── Mirrors AdminPage resolveThumb exactly ────────────────────────────────
 function resolveThumb(img) {
-    const raw = img?.src || img?.Slug || img?.slug || ''
+    const raw = img?.secureUrl || img?.src || img?.Slug || img?.slug || ''
     if (!raw) return null
     if (raw.startsWith('https://') || raw.startsWith('http://')) return raw
     const wixMatch = raw.match(/wix:image:\/\/v1\/([^/]+)\//)
@@ -237,7 +256,7 @@ export default function PropertyListingsGrid() {
                         >
                             {currentCards.map((property, i) => (
                                 <div
-                                    key={`${currentPage}-${property.id}`}
+                                    key={`${currentPage}-${property.slug || property.id || i}`}
                                     style={{
                                         opacity: visible && !transitioning ? 1 : 0,
                                         transform: visible && !transitioning ? 'translateY(0)' : 'translateY(20px)',

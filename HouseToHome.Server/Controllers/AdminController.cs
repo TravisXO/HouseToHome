@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
-using HouseToHome.Server.Data;
 
 namespace HouseToHome.Server.Controllers
 {
@@ -8,119 +7,75 @@ namespace HouseToHome.Server.Controllers
     [Route("api/[controller]")]
     public class AdminController : ControllerBase
     {
-        private readonly AppDbContext _db;
+        private readonly IConfiguration _config;
         private readonly ILogger<AdminController> _logger;
 
-        private static readonly JsonSerializerOptions WriteOpts = new()
-        {
-            WriteIndented = true,
-        };
+        private static readonly JsonSerializerOptions WriteOpts = new() { WriteIndented = true };
 
-        public AdminController(AppDbContext db, ILogger<AdminController> logger)
+        public AdminController(IConfiguration config, ILogger<AdminController> logger)
         {
-            _db = db;
+            _config = config;
             _logger = logger;
         }
 
-        // ── GET /api/admin/properties ─────────────────────────────────
-        // Mirrors AdminPage.jsx load logic:
-        //   1. Read all-properties.json           → _source: "legacy"
-        //   2. Read housetohome-properties-rent.json → _source: "custom"
-        //   3. Read housetohome-properties-buy.json  → _source: "custom"
-        //   4. Merge: custom entries override legacy entries with the same ID
-        //   5. Return the merged flat array
+        // ── GET /api/admin/properties ─────────────────────────────────────────
+        // 1. Read all-properties.json  → _source: "legacy"
+        // 2. Read Rent.json            → _source: "managed"
+        // 3. Read Buy.json             → _source: "managed"
+        // 4. Merge: managed entries override legacy entries with the same ID
+        // 5. Return merged flat array
         [HttpGet("properties")]
         public async Task<IActionResult> GetProperties()
         {
-            var legacyPath = FindJsonFile("all-properties.json");
-            if (legacyPath == null)
-                return NotFound(new { message = "Make sure all-properties.json exists in src/data/" });
+            var legacyItems = await SafeReadArray(FindLegacyFile());
 
-            var legacyJson = await System.IO.File.ReadAllTextAsync(legacyPath);
-            var legacy = JsonSerializer.Deserialize<List<JsonElement>>(legacyJson)
-                         ?? new List<JsonElement>();
+            var rentItems = await SafeReadArray(GetManagedPath("Rent.json"));
+            var buyItems = await SafeReadArray(GetManagedPath("Buy.json"));
+            var managedItems = rentItems.Concat(buyItems).ToList();
 
-            // Load the two custom split files — return empty list if they don't exist yet
-            var customRent = await SafeReadJsonArray(FindJsonFile("housetohome-properties-rent.json"));
-            var customBuy = await SafeReadJsonArray(FindJsonFile("housetohome-properties-buy.json"));
-            var customAll = customRent.Concat(customBuy).ToList();
+            var managedIds = managedItems
+                .Select(GetId).Where(id => id != null).ToHashSet();
 
-            // Build a set of IDs that are already in the custom files
-            var customIds = customAll
-                .Select(e => GetId(e))
-                .Where(id => id != null)
-                .ToHashSet();
-
-            // Filter legacy: skip any entry whose ID already exists in custom files
-            var filteredLegacy = legacy
-                .Where(e => !customIds.Contains(GetId(e)))
-                .Select(e => TagSource(e, "legacy"))
+            var result = managedItems.Select(e => TagSource(e, "managed"))
+                .Concat(legacyItems
+                    .Where(e => !managedIds.Contains(GetId(e)))
+                    .Select(e => TagSource(e, "legacy")))
                 .ToList();
-
-            var taggedCustom = customAll
-                .Select(e => TagSource(e, "custom"))
-                .ToList();
-
-            var merged = filteredLegacy.Concat(taggedCustom).ToList();
 
             _logger.LogInformation(
-                "Admin GET: {Legacy} legacy + {Custom} custom = {Total} total",
-                filteredLegacy.Count, taggedCustom.Count, merged.Count);
+                "Admin GET: {M} managed + {L} legacy = {T} total",
+                managedItems.Count, result.Count - managedItems.Count, result.Count);
 
-            var resultJson = JsonSerializer.Serialize(merged, WriteOpts);
-            return Content(resultJson, "application/json");
+            return Content(JsonSerializer.Serialize(result, WriteOpts), "application/json");
         }
 
-        // ── POST /api/admin/properties ────────────────────────────────
-        // AdminPage.jsx sends: { rent: [...], buy: [...] }
-        // Writes each array to its own file, then removes those IDs from
-        // all-properties.json so legacy entries don't show up as duplicates.
+        // ── POST /api/admin/properties ────────────────────────────────────────
+        // Body: { rent: [...], buy: [...] }
+        // Writes each array to Rent.json / Buy.json.
+        // Prunes saved IDs from all-properties.json (legacy migration).
         [HttpPost("properties")]
         public async Task<IActionResult> SaveProperties([FromBody] JsonElement body)
         {
-            // Extract the rent and buy arrays from the payload
             if (!body.TryGetProperty("rent", out var rentEl) ||
                 !body.TryGetProperty("buy", out var buyEl))
-            {
-                return BadRequest(new { message = "Body must contain { rent: [...], buy: [...] }" });
-            }
+                return BadRequest(new { message = "Body must be { rent: [...], buy: [...] }" });
 
-            var rentItems = JsonSerializer.Deserialize<List<JsonElement>>(rentEl.GetRawText())
-                            ?? new List<JsonElement>();
-            var buyItems = JsonSerializer.Deserialize<List<JsonElement>>(buyEl.GetRawText())
-                            ?? new List<JsonElement>();
+            var rentItems = Deserialise(rentEl).Select(EnsureSlug).ToList();
+            var buyItems = Deserialise(buyEl).Select(EnsureSlug).ToList();
 
-            // Resolve output paths next to all-properties.json
-            var legacyPath = FindJsonFile("all-properties.json");
-            if (legacyPath == null)
-                return StatusCode(500, new { message = "Could not locate all-properties.json to resolve output path." });
+            EnsureDataDir();
+            var rentPath = GetManagedPath("Rent.json");
+            var buyPath = GetManagedPath("Buy.json");
 
-            var dataDir = System.IO.Path.GetDirectoryName(legacyPath)!;
-            var rentPath = System.IO.Path.Combine(dataDir, "housetohome-properties-rent.json");
-            var buyPath = System.IO.Path.Combine(dataDir, "housetohome-properties-buy.json");
+            await System.IO.File.WriteAllTextAsync(rentPath, JsonSerializer.Serialize(rentItems, WriteOpts));
+            await System.IO.File.WriteAllTextAsync(buyPath, JsonSerializer.Serialize(buyItems, WriteOpts));
 
-            // Ensure every property has a Slug before writing
-            rentItems = rentItems.Select(EnsureSlug).ToList();
-            buyItems = buyItems.Select(EnsureSlug).ToList();
+            _logger.LogInformation("Admin POST: {R} rent + {B} buy saved", rentItems.Count, buyItems.Count);
 
-            // Write the split files
-            await System.IO.File.WriteAllTextAsync(
-                rentPath, JsonSerializer.Serialize(rentItems, WriteOpts));
-            await System.IO.File.WriteAllTextAsync(
-                buyPath, JsonSerializer.Serialize(buyItems, WriteOpts));
-
-            _logger.LogInformation(
-                "Admin POST: wrote {Rent} rent + {Buy} buy items",
-                rentItems.Count, buyItems.Count);
-
-            // Remove migrated IDs from all-properties.json so the legacy file
-            // no longer contains entries that are now managed in the split files
-            var allCustomIds = rentItems.Concat(buyItems)
-                .Select(e => GetId(e))
-                .Where(id => id != null)
-                .ToHashSet();
-
-            await PruneLegacyFile(legacyPath, allCustomIds!);
+            // Prune migrated IDs from legacy file so they no longer show as duplicates
+            var allSavedIds = rentItems.Concat(buyItems)
+                .Select(GetId).Where(id => id != null).ToHashSet();
+            await PruneLegacyFile(allSavedIds!);
 
             return Ok(new
             {
@@ -128,173 +83,169 @@ namespace HouseToHome.Server.Controllers
                 rentPath,
                 buyPath,
                 rentCount = rentItems.Count,
-                buyCount = buyItems.Count,
+                buyCount = buyItems.Count
             });
         }
 
-        // ── POST /api/admin/reseed ────────────────────────────────────
-        [HttpPost("reseed")]
-        public async Task<IActionResult> Reseed()
+        // ── DELETE /api/admin/properties/{id} ─────────────────────────────────
+        // Removes property from Rent.json or Buy.json (or legacy file if not yet migrated).
+        // NOTE: Cloudinary media is deleted separately via DELETE /api/cloudinary
+        [HttpDelete("properties/{id}")]
+        public async Task<IActionResult> DeleteProperty(string id)
         {
-            _logger.LogInformation("Admin: clearing properties table for re-seed...");
-            _db.Properties.RemoveRange(_db.Properties);
-            await _db.SaveChangesAsync();
+            var deleted = false;
+            foreach (var file in new[] { GetManagedPath("Rent.json"), GetManagedPath("Buy.json") })
+            {
+                var items = await SafeReadArray(file);
+                var before = items.Count;
+                items = items.Where(e => GetId(e) != id).ToList();
+                if (items.Count < before)
+                {
+                    await System.IO.File.WriteAllTextAsync(file, JsonSerializer.Serialize(items, WriteOpts));
+                    deleted = true;
+                    _logger.LogInformation("Deleted {Id} from {File}", id, System.IO.Path.GetFileName(file));
+                }
+            }
 
-            await DataSeeder.SeedAsync(_db, _logger);
+            if (!deleted)
+                await PruneLegacyFile(new HashSet<string> { id });
 
-            var count = _db.Properties.Count();
-            _logger.LogInformation("Admin: re-seed complete — {Count} properties in DB.", count);
-            return Ok(new { message = $"Re-seeded successfully. {count} properties now in database." });
+            return Ok(new { message = $"Property {id} deleted." });
         }
 
-        // ── Helpers ───────────────────────────────────────────────────
+        // ── Helpers ───────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Reads a JSON file as a list of elements. Returns an empty list if the
-        /// file path is null or the file doesn't exist yet.
-        /// </summary>
-        private static async Task<List<JsonElement>> SafeReadJsonArray(string? path)
+        private string GetManagedPath(string filename)
         {
-            if (path == null || !System.IO.File.Exists(path))
-                return new List<JsonElement>();
+            var dir = _config["DataPaths:Directory"]
+                ?? System.IO.Path.Combine(AppContext.BaseDirectory, "data");
+            return System.IO.Path.Combine(dir, filename);
+        }
 
+        private void EnsureDataDir()
+        {
+            var dir = System.IO.Path.GetDirectoryName(GetManagedPath("_"))!;
+            if (!System.IO.Directory.Exists(dir))
+                System.IO.Directory.CreateDirectory(dir);
+        }
+
+        private static async Task<List<JsonElement>> SafeReadArray(string? path)
+        {
+            if (path == null || !System.IO.File.Exists(path)) return new();
             try
             {
                 var json = await System.IO.File.ReadAllTextAsync(path);
-                return JsonSerializer.Deserialize<List<JsonElement>>(json)
-                       ?? new List<JsonElement>();
+                return JsonSerializer.Deserialize<List<JsonElement>>(json) ?? new();
             }
-            catch
-            {
-                return new List<JsonElement>();
-            }
+            catch { return new(); }
         }
 
-        /// <summary>
-        /// Extracts the ID field from a raw JSON element (handles "ID" or "id").
-        /// </summary>
+        private static List<JsonElement> Deserialise(JsonElement el)
+            => JsonSerializer.Deserialize<List<JsonElement>>(el.GetRawText()) ?? new();
+
         private static string? GetId(JsonElement el)
         {
-            if (el.TryGetProperty("ID", out var v) && v.ValueKind == JsonValueKind.String)
-                return v.GetString();
-            if (el.TryGetProperty("id", out v) && v.ValueKind == JsonValueKind.String)
-                return v.GetString();
+            foreach (var key in new[] { "id", "ID" })
+                if (el.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String)
+                    return v.GetString();
             return null;
         }
 
-        /// <summary>
-        /// Returns a new JsonElement with a _source field added.
-        /// </summary>
         private static JsonElement TagSource(JsonElement el, string source)
         {
-            // Rebuild the object with _source injected
             using var ms = new System.IO.MemoryStream();
-            using (var writer = new Utf8JsonWriter(ms))
+            using (var w = new Utf8JsonWriter(ms))
             {
-                writer.WriteStartObject();
-                writer.WriteString("_source", source);
-                foreach (var prop in el.EnumerateObject())
+                w.WriteStartObject();
+                w.WriteString("_source", source);
+                foreach (var p in el.EnumerateObject())
                 {
-                    // Skip existing _source so we don't duplicate it
-                    if (prop.Name == "_source") continue;
-                    prop.WriteTo(writer);
+                    if (p.Name == "_source") continue;
+                    p.WriteTo(w);
                 }
-                writer.WriteEndObject();
+                w.WriteEndObject();
             }
-            var doc = JsonDocument.Parse(ms.ToArray());
-            return doc.RootElement.Clone();
+            return JsonDocument.Parse(ms.ToArray()).RootElement.Clone();
         }
 
-        /// <summary>
-        /// Ensures a property element has a non-empty Slug field.
-        /// If missing, generates one from Title + first 8 chars of ID.
-        /// </summary>
         private static JsonElement EnsureSlug(JsonElement el)
         {
-            if (el.TryGetProperty("Slug", out var existing) &&
-                existing.ValueKind == JsonValueKind.String &&
-                !string.IsNullOrWhiteSpace(existing.GetString()))
+            if (el.TryGetProperty("slug", out var s) &&
+                s.ValueKind == JsonValueKind.String &&
+                !string.IsNullOrWhiteSpace(s.GetString()))
                 return el;
 
-            var title = el.TryGetProperty("Title", out var t) ? t.GetString() ?? "" : "";
+            var title = el.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
             var id = GetId(el) ?? Guid.NewGuid().ToString("N");
             var slug = Slugify(title) + "-" + id[..Math.Min(8, id.Length)];
 
             using var ms = new System.IO.MemoryStream();
-            using (var writer = new Utf8JsonWriter(ms))
+            using (var w = new Utf8JsonWriter(ms))
             {
-                writer.WriteStartObject();
-                writer.WriteString("Slug", slug);
-                foreach (var prop in el.EnumerateObject())
+                w.WriteStartObject();
+                w.WriteString("slug", slug);
+                foreach (var p in el.EnumerateObject())
                 {
-                    if (prop.Name == "Slug") continue;
-                    prop.WriteTo(writer);
+                    if (p.Name == "slug") continue;
+                    p.WriteTo(w);
                 }
-                writer.WriteEndObject();
+                w.WriteEndObject();
             }
-            var doc = JsonDocument.Parse(ms.ToArray());
-            return doc.RootElement.Clone();
+            return JsonDocument.Parse(ms.ToArray()).RootElement.Clone();
         }
 
         private static string Slugify(string text)
         {
-            var slug = text.ToLowerInvariant();
-            slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[^a-z0-9\s-]", "");
-            slug = System.Text.RegularExpressions.Regex.Replace(slug, @"\s+", "-");
-            slug = System.Text.RegularExpressions.Regex.Replace(slug, @"-+", "-").Trim('-');
-            return slug.Length > 80 ? slug[..80] : slug;
+            var s = text.ToLowerInvariant();
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"[^a-z0-9\s-]", "");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", "-");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"-+", "-").Trim('-');
+            return s.Length > 80 ? s[..80] : s;
         }
 
-        /// <summary>
-        /// Removes entries from all-properties.json whose IDs are in the given set.
-        /// This "migrates" legacy entries as they get saved through the admin.
-        /// </summary>
-        private async Task PruneLegacyFile(string legacyPath, HashSet<string> idsToRemove)
+        private async Task PruneLegacyFile(HashSet<string> idsToRemove)
         {
+            var legacyPath = FindLegacyFile();
+            if (legacyPath == null) return;
             try
             {
-                var json = await System.IO.File.ReadAllTextAsync(legacyPath);
-                var all = JsonSerializer.Deserialize<List<JsonElement>>(json)
-                              ?? new List<JsonElement>();
-                var pruned = all.Where(e => !idsToRemove.Contains(GetId(e) ?? "")).ToList();
-
-                if (pruned.Count < all.Count)
+                var items = await SafeReadArray(legacyPath);
+                var pruned = items.Where(e => !idsToRemove.Contains(GetId(e) ?? "")).ToList();
+                if (pruned.Count < items.Count)
                 {
-                    await System.IO.File.WriteAllTextAsync(
-                        legacyPath, JsonSerializer.Serialize(pruned, WriteOpts));
-                    _logger.LogInformation(
-                        "Admin POST: pruned {Count} migrated entries from all-properties.json",
-                        all.Count - pruned.Count);
+                    await System.IO.File.WriteAllTextAsync(legacyPath,
+                        JsonSerializer.Serialize(pruned, WriteOpts));
+                    _logger.LogInformation("Pruned {N} entries from all-properties.json",
+                        items.Count - pruned.Count);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Admin POST: could not prune legacy file — {Msg}", ex.Message);
+                _logger.LogWarning("Could not prune legacy file: {Msg}", ex.Message);
             }
         }
 
-        /// <summary>
-        /// Walks up the directory tree from AppContext.BaseDirectory looking for
-        /// the file in common locations. Mirrors DataSeeder.FindJsonFile.
-        /// </summary>
-        private static string? FindJsonFile(string filename)
+        /// <summary>Walks up the directory tree to locate all-properties.json.</summary>
+        private static string? FindLegacyFile()
         {
             var dir = AppContext.BaseDirectory;
             for (var i = 0; i < 6; i++)
             {
-                var candidate = System.IO.Path.Combine(dir, "src", "data", filename);
-                if (System.IO.File.Exists(candidate)) return candidate;
-
-                candidate = System.IO.Path.Combine(dir, filename);
-                if (System.IO.File.Exists(candidate)) return candidate;
+                foreach (var rel in new[] {
+                    System.IO.Path.Combine("src", "data", "all-properties.json"),
+                    "all-properties.json" })
+                {
+                    var c = System.IO.Path.Combine(dir, rel);
+                    if (System.IO.File.Exists(c)) return c;
+                }
 
                 try
                 {
                     foreach (var clientDir in System.IO.Directory.GetDirectories(
                         dir, "*client*", System.IO.SearchOption.TopDirectoryOnly))
                     {
-                        candidate = System.IO.Path.Combine(clientDir, "src", "data", filename);
-                        if (System.IO.File.Exists(candidate)) return candidate;
+                        var c = System.IO.Path.Combine(clientDir, "src", "data", "all-properties.json");
+                        if (System.IO.File.Exists(c)) return c;
                     }
                 }
                 catch (UnauthorizedAccessException) { }

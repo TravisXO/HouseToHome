@@ -13,6 +13,7 @@ builder.Services.AddControllers()
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpClient(); // Required by CloudinaryController
 
 // ── Validate connection string early so the error is obvious ──────────────
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
