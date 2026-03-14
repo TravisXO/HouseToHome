@@ -12,7 +12,6 @@ const PropertyListingGrid = lazy(() => import('./components/home/PropertyListing
 const InvestmentBanner = lazy(() => import('./components/home/InvestmentBanner'))
 const ServiceSection = lazy(() => import('./components/home/ServiceSection'))
 const TestimonialSlider = lazy(() => import('./components/home/TestimonialSlider'))
-const BlogPreviewSection = lazy(() => import('./components/home/BlogPreviewSections'))
 const PartnersSection = lazy(() => import('./components/home/PartnerSections'))
 
 // ── Lazy: route-level pages ──
@@ -46,7 +45,6 @@ function HomePage() {
                 <InvestmentBanner />
                 <ServiceSection />
                 <TestimonialSlider />
-                <BlogPreviewSection />
                 <PartnersSection />
             </Suspense>
         </main>

@@ -24,7 +24,6 @@ const NAV_ITEMS = [
     },
     { label: 'About Us', href: '/about' },
     { label: 'Testimonials', href: '/testimonials' },
-    { label: 'Blog', href: '/blog' },
 ]
 
 const FacebookIcon = () => (
