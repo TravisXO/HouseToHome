@@ -7,12 +7,17 @@
     <title>HouseToHome — Lusaka Property Listings</title>
     <meta name="description" content="Find residential, commercial and investment properties for sale and rent in Lusaka, Zambia." />
 
-    <!-- Preconnect to origins needed early — saves ~140–180ms per origin -->
-    <link rel="preconnect" href="https://static.wixstatic.com" />
-    <link rel="dns-prefetch" href="https://static.wixstatic.com" />
+    <!-- Preconnect to Cloudinary (images) and Google Fonts -->
+    <link rel="preconnect" href="https://res.cloudinary.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://unpkg.com" />
+
+    <!-- Non-blocking font load — eliminates the 440ms render block -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'" />
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" />
+    </noscript>
 </head>
 <body>
     <div id="root"></div>

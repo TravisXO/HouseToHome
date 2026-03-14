@@ -75,6 +75,8 @@ export default function PropertyCard({ property, priority = false }) {
                         <img
                             src={imageUrl}
                             alt={coverAlt}
+                            width="600"
+                            height="210"
                             loading={priority ? 'eager' : 'lazy'}
                             decoding="async"
                             onError={() => setImgError(true)}
